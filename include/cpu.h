@@ -4,6 +4,8 @@
 #include <functional>
 #include <string>
 #include <variant>
+#include <cstdint>
+
 
 class Emulator; // forward declare to avoid circular definition, need to to link read and write
 

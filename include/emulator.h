@@ -3,9 +3,12 @@
 #include <array>
 #include <string>
 #include <memory>
+#include <cstdint>
+
 
 #include "cartridge.h"
 #include "cpu.h"
+
 
 class Emulator
 {

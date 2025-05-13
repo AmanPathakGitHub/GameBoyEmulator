@@ -3,6 +3,8 @@
 #include <emulator.h>
 
 #include <raylib.h>
+#include <cstdint>
+
 
 struct ApplicationSettings
 {

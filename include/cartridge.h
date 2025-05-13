@@ -3,6 +3,8 @@
 #include <array>
 #include <string>
 
+#include <cstdint>
+
 class Cartridge
 {
 public:
