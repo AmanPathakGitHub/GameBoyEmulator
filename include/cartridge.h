@@ -16,6 +16,7 @@ public:
 private:
 
 	uint8_t* m_CartData; // all cart memory including whats in the different banks
+	uint32_t m_ROM_size;
 	uint8_t  m_MemoryBank = 0;
 
 };

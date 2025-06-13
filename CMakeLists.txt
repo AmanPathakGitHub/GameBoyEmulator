@@ -6,6 +6,15 @@ project(GameBoyEmulator)
 
 include(FetchContent)
 
+enable_testing()
+
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/heads/main.zip
+)
+# Prevent GoogleTest from overriding our compiler/linker options
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
 
 
 find_package(raylib)
@@ -55,8 +64,17 @@ target_link_libraries(imgui)
 
 
 file(GLOB SOURCE_FILES "src/*.cpp")
+list(FILTER SOURCE_FILES EXCLUDE REGEX ".*main\\.cpp$")
 file(GLOB INCLUDE_FILES "include/*.h")
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${INCLUDE_FILES})
-target_include_directories(${PROJECT_NAME} PUBLIC "include/" ${raylib_SOURCE_DIR}/src ${rlimgui_SOURCE_DIR})
-target_link_libraries(${PROJECT_NAME} glfw raylib rlImGui imgui)
+add_library(GameBoyLib ${SOURCE_FILES} ${INCLUDE_FILES})
+target_include_directories(GameBoyLib PUBLIC "include/" ${raylib_SOURCE_DIR}/src ${rlimgui_SOURCE_DIR})
+target_link_libraries(GameBoyLib glfw raylib rlImGui imgui)
+
+add_executable(GameBoyTests "tests/main.cpp")
+target_link_libraries(GameBoyTests GameBoyLib gtest_main)
+
+add_test(NAME CPU_TESTS COMMAND GameBoyTests)
+
+add_executable(GameBoyEmulator "src/main.cpp")
+target_link_libraries(GameBoyEmulator GameBoyLib)

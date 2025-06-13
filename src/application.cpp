@@ -3,6 +3,7 @@
 #include <format>
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #include <raylib.h>
 
@@ -54,12 +55,13 @@ Application::Application(const ApplicationSettings settings)
 
 	ImGui_ImplRaylib_Init();
 
+	emu.LoadROM("01-special.gb");
 
 }
 
 Application::~Application()
 {
-	
+
 	ImGui_ImplRaylib_Shutdown();
 	ImGui::DestroyContext();
 
@@ -76,13 +78,108 @@ void Application::DrawRegisters()
 	DrawText(std::format("HL: 0x{:x}", emu.cpu.HL.reg).c_str(), 10, 90, 20, BLACK);
 	DrawText(std::format("SP: 0x{:x}", emu.cpu.SP).c_str(), 10, 110, 20, BLACK);
 	DrawText(std::format("PC: 0x{:x}", emu.cpu.PC).c_str(), 10, 130, 20, BLACK);
+
 }
+
 
 void Application::DrawMemory(uint32_t x, uint32_t y, uint16_t startAddress, uint16_t endAddress)
 {
-
-	
 }
+
+std::vector<std::string> Application::dissassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress)
+{
+	std::vector<std::string> output;
+	for(uint16_t currentAddress = startAddress; currentAddress <= endAddress;)
+	{
+		uint8_t opcode = emu.read(currentAddress++);
+		CPU::Instruction currentInstruction = emu.cpu.InstructionByOpcode(opcode);
+		
+		std::stringstream ss;
+
+		if(currentAddress == emu.cpu.PC)
+			ss << "***";
+
+		ss << std::hex << currentAddress - 1 << " " << std::hex << (int)opcode << " " << currentInstruction.name;
+		
+		WriteParams(emu, currentInstruction.operand1, ss, currentAddress);
+		WriteParams(emu, currentInstruction.operand2, ss, currentAddress);
+
+		output.push_back(ss.str());
+	}
+
+	// std::cout << output[0] << std::endl;
+	return output;
+}
+
+
+void Application::WriteParams(Emulator& emu, CPU::Operand& op, std::stringstream& ss, uint16_t& currentAddress)
+{
+			switch(op.mode)
+		{
+			case CPU::AddressingMode::IMM8:
+				ss << " " << std::hex << (int)emu.read(currentAddress++);
+				break;
+			case CPU::AddressingMode::IMM16:
+				ss << " " << std::hex << (int)emu.read16(currentAddress);
+				currentAddress += 2;
+				break;
+			
+			case CPU::AddressingMode::REG16:
+			case CPU::AddressingMode::REG8:
+				ss << " " << RegTypeToString(op.reg);
+				break;
+			case CPU::AddressingMode::IND:
+				ss << " (" << RegTypeToString(op.reg) << ")";
+				break;
+			case CPU::AddressingMode::IND_IMM8:
+				ss << " (" << std::hex << (int)emu.read(currentAddress++) << ")";
+				break;
+			case CPU::AddressingMode::IND_IMM16:
+				ss << " (" << std::hex << (int)emu.read16(currentAddress) << ")";
+				currentAddress += 2;
+				break;
+			case CPU::AddressingMode::COND:
+				ss << " " << CondTypeToString(op.cond);
+
+		}
+}
+
+std::string Application::RegTypeToString(CPU::RegType reg)
+{
+	switch (reg)
+	{
+		case CPU::RegType::NONE: return "NONE";
+        case CPU::RegType::A:    return "A";
+        case CPU::RegType::B:    return "B";
+        case CPU::RegType::C:    return "C";
+        case CPU::RegType::D:    return "D";
+        case CPU::RegType::E:    return "E";
+        case CPU::RegType::H:    return "H";
+        case CPU::RegType::L:    return "L";
+        case CPU::RegType::AF:   return "AF";
+        case CPU::RegType::BC:   return "BC";
+        case CPU::RegType::DE:   return "DE";
+        case CPU::RegType::HL:   return "HL";
+        case CPU::RegType::SP:   return "SP";
+        case CPU::RegType::HLI:  return "HLI";
+        case CPU::RegType::HLD:  return "HLD";
+        default: return "UNKNOWN";
+	}
+}
+
+std::string Application::CondTypeToString(CPU::CondType cond)
+{
+	switch (cond)
+    {
+        case CPU::CondType::NONE: return "NONE";
+        case CPU::CondType::Z:    return "Z";
+        case CPU::CondType::NZ:   return "NZ";
+        case CPU::CondType::C:    return "C";
+        case CPU::CondType::NC:   return "NC";
+        default: return "UNKNOWN";
+    }
+}
+
 
 void Application::Run()
 {
@@ -135,6 +232,11 @@ void Application::Run()
 
 		ImGui::Begin("MemoryView");
 		ImGui::Text("A: 0x%x", emu.cpu.AF.hi);
+		ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_C) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "C");
+		ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_H) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "H");
+		ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_N) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "N");
+		ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_Z) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Z");
+
 		ImGui::Text("B: 0x%x", emu.cpu.BC.hi);
 		ImGui::Text("C: 0x%x", emu.cpu.BC.lo);
 		ImGui::Text("D: 0x%x", emu.cpu.DE.hi);
@@ -142,6 +244,9 @@ void Application::Run()
 		ImGui::Text("HL: 0x%x", emu.cpu.HL.reg);
 		ImGui::Text("SP: 0x%x", emu.cpu.SP);
 		ImGui::Text("PC: 0x%x", emu.cpu.PC);
+		ImGui::Text("Cycles: %d", emu.m_SystemTicks);
+
+		
 
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
@@ -183,7 +288,7 @@ void Application::Run()
 					for (int j = 0; j < 16; j++) {
 						if (i + j >= emu.memory.size())
 							break;
-						text += std::format("{:02X} ", emu.memory[i + j]); // Fix formatting
+						text += std::format("{:02X} ", emu.read(i + j)); // Fix formatting
 					}
 
 					if (i == searchNumber)
@@ -205,8 +310,25 @@ void Application::Run()
 
 		ImGui::End();
 
+		ImGui::Begin("Disassembly");
+
+		std::vector<std::string> dissassemblylines = dissassemble(emu, emu.cpu.PC, emu.cpu.PC + 15);
+
+		for(std::string l : dissassemblylines)
+			ImGui::Text(l.c_str());
+
+		ImGui::End();
+
 		
 		// Update
+
+
+
+		// if(msg[0])
+		// {
+		// 	std::cout << msg << std::endl;
+		// }
+
 		if (IsKeyPressed(KEY_C))
 		{
 			emu.clock();
@@ -214,7 +336,26 @@ void Application::Run()
 		else if (IsKeyPressed(KeyboardKey(KEY_R)))
 		{
 			emu.cpu.Reset();
+		} 
+		else if (IsKeyPressed(KEY_SPACE))
+		{
+			emu_run  = !emu_run;
 		}
+		else if (IsKeyPressed(KEY_P))
+		{
+			for(int i = 0; i < 100; i++)
+				emu.clock(); 
+		}
+		else if (IsKeyPressed(KEY_K))
+		{
+			for(int i = 0; i < 20; i++)
+				emu.clock(); 
+		}
+
+
+
+		if(emu_run) emu.UpdateFrame();
+
 		ImGui::Render();
 		BeginDrawing();
 		ImGui_ImplRaylib_RenderDrawData(ImGui::GetDrawData());
@@ -226,6 +367,5 @@ void Application::Run()
 
 		EndTextureMode();
 	}
-
 
 }

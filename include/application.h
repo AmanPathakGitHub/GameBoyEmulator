@@ -3,8 +3,8 @@
 #include <emulator.h>
 
 #include <raylib.h>
-#include <cstdint>
 
+#include <fstream>
 
 struct ApplicationSettings
 {
@@ -21,8 +21,13 @@ public:
 
 	void Run();
 
+	static std::vector<std::string> dissassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress);
+	static std::string RegTypeToString(CPU::RegType reg);
+	static std::string CondTypeToString(CPU::CondType cond);
+
 private:
 	Emulator emu;
+	bool emu_run = false;
 
 	RenderTexture2D renderTexture;
 
@@ -31,5 +36,8 @@ private:
 		
 	void DrawRegisters();
 	void DrawMemory(uint32_t x, uint32_t y, uint16_t startAddress, uint16_t endAddress);
+
+	static void WriteParams(Emulator& emu, CPU::Operand& op, std::stringstream& ss, uint16_t& currentAddress);
+
 
 };

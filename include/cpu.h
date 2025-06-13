@@ -5,6 +5,7 @@
 #include <string>
 #include <variant>
 #include <cstdint>
+#include <fstream>
 
 
 class Emulator; // forward declare to avoid circular definition, need to to link read and write
@@ -14,15 +15,27 @@ class Emulator; // forward declare to avoid circular definition, need to to link
 #define FLAG_N 6
 #define FLAG_Z 7
 
+class CPUTest;
+
 class CPU
 {
+	friend class CPUTest;
 public:
+
+	CPU();
 	void ConnectCPUToBus(Emulator* emu);
 
 	void Reset();
 	void Clock();
+	bool CheckInterrupt(uint8_t interupt_type, uint16_t address);
+
 
 	bool halted = false;
+	bool int_master_enabled = false;
+	bool ime_enabling = false;
+
+	uint8_t int_enable = 0;
+	uint8_t int_flag = 0;
 
 	union Register
 	{
@@ -34,6 +47,65 @@ public:
 		};
 	};
 
+	enum AddressingMode {
+		IMPL,
+		IMM8,
+		IMM16,
+		REG8,
+		REG16,
+		IND,				// Indirect
+		IND_IMM8,
+		IND_IMM16,
+		COND
+	};
+
+	
+	enum class CondType {
+		NONE,
+		Z,
+		NZ,
+		C,
+		NC
+	};
+
+	 enum class RegType {
+		NONE,
+		A,
+		B,
+		C,
+		D,
+		E,
+		H,
+		L,
+		AF,
+		BC,
+		DE,
+		HL,
+		SP,
+		HLI,
+		HLD
+	};
+
+
+	struct Operand {
+		AddressingMode mode;
+		RegType reg;
+		CondType cond;
+		uint8_t meta; // rst's return address or bit index or anything else encoded into the instruction
+	};
+
+
+	struct Instruction
+	{
+		std::string name = ""; // For disassembly
+		uint8_t cycles = 0;
+		void (CPU::* execute)() = nullptr;
+		
+		Operand operand1;
+		Operand operand2;
+
+	};
+
 	Register AF;
 	Register BC;
 	Register DE;
@@ -41,72 +113,110 @@ public:
 
 	uint16_t PC;
 	uint16_t SP;
-private:
 
-	Emulator* emu;
+	Instruction InstructionByOpcode(uint8_t opcode);
 	uint8_t m_Cycles = 0;
-	
 
 	void SetFlag(uint8_t flag, uint8_t value);
+	uint8_t GetFlag(uint8_t flag);
 
+	Instruction jumptable[256];
+
+private:
+	Emulator* emu;
+	
+	std::ofstream debug_file;
+
+	Instruction HandleCBInstruction();
+
+	void cpu_push(uint8_t byte);
+	uint8_t cpu_pop();
+
+	void cpu_push16(uint16_t byte);
+	uint16_t cpu_pop16();
+
+public:
 	// Instructions 
 	void NOP();
 	void HALT();
 	void LD();
+	void LD_HL_SP();
 	void INC();
 	void DEC();
 	void ADD();
 	void SUB();
+	void ADC();
+	void SBC();
+	void AND();
+	void XOR();
+	void OR();
+	void CP();
+	void RET();
+	void PUSH();
+	void POP();
+	void JP();
+	void JR();
+	void CALL();
+	void RLCA();
+	void RLA();
+	void RRCA();
+	void RRA();
+	void SCF();
+	void CPL();
+	void CCF();
+	void STOP();
+	void RETI();
+	void DI();
+	void EI();
+	void RST();
+	void DAA();
 
-	// creating types to seperate the different operands from each other
-	// needed because IMM16 and MEM16 are both uint16_t but two different things
-	// if the operand is a register we will give it a reference to the actual value
-	// bool is for condition
-	struct IMM8 	{ uint8_t value; };
-	struct IMM16 	{ uint16_t value; };
-	struct REG8 	{ uint8_t* reg_ptr; };
-	struct REG16  	{ uint16_t* reg_ptr; };
-	struct MEM16    { uint16_t address; };
-	struct COND		{ bool cond; }; 	// maybe should be uint8_t idk?
-
-	using Operand = std::variant<std::monostate, IMM8, IMM16, REG8, REG16, MEM16, COND>;
-
-	struct Instruction
-	{
-		std::string name; // for disassembly
-		uint8_t cycles;
-		void (CPU::* execute)() = nullptr;
-
-		Operand operand1;
-		Operand operand2;
-
-		static bool Is16Bit(const Operand& operand) {
-    		return std::holds_alternative<REG16>(operand) ||
-           		   std::holds_alternative<MEM16>(operand) ||
-           		   std::holds_alternative<IMM16>(operand);
-		}
-
-	};
-
-	uint16_t fetch(const Operand& operand);
+	// CB instructions
+	void RLC();
+	void RRC();
+	void RL();
+	void RR();
+	void SLA();
+	void SRA();
+	void SWAP();
+	void SRL();
+	void BIT();
+	void SET();
+	void RES();
+	
 
 	Instruction m_CurrentInstruction;
 
-	
-	Instruction InstructionByOpcode(uint8_t opcode);
-	
-	// https://gbdev.io/pandocs/CPU_Instruction_Set.html
-	Operand DecodeReg8(uint8_t bits);
-	Operand DecodeReg16(uint8_t bits);
-	Operand DecodeReg16STK(uint8_t bits);
-	Operand DecodeReg16MEM(uint8_t bits);
+private:
+
+	inline bool Is16Bit(const Operand& operand) {
+		return operand.mode == REG16 ||
+			   operand.mode == IMM16			   ;
+
+	}
 
 
+	uint16_t fetch(const Operand& operand);
+	// fetching helper functions
+	uint16_t getRegisterValue(RegType type);
 
-
-	// might make it have the same name?
+	// might do function overloading but seems fine for now
 	void writeOperand8(Operand& op, uint8_t operand);
 	void writeOperand16(Operand& op, uint16_t operand);
+
+	void writeRegister8(RegType reg, uint8_t value);
+	void writeRegister16(RegType reg, uint16_t value);
+
+	bool checkCond(CondType cond);
+
+
+	
+	// https://gbdev.io/pandocs/CPU_Instruction_Set.html
+	static Operand DecodeReg8(uint8_t bits);
+	static Operand DecodeReg16(uint8_t bits);
+	static Operand DecodeReg16STK(uint8_t bits);
+	static Operand DecodeReg16MEM(uint8_t bits);
+	static Operand DecodeCond(uint8_t bits);
 
 
 };
