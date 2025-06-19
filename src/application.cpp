@@ -33,6 +33,8 @@ Application::Application(const ApplicationSettings settings)
 	SetTargetFPS(60); 
 
 	renderTexture = LoadRenderTexture(160, 144);
+	tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
+
 
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -55,7 +57,7 @@ Application::Application(const ApplicationSettings settings)
 
 	ImGui_ImplRaylib_Init();
 
-	emu.LoadROM("01-special.gb");
+	emu.LoadROM("Tetris (JUE) (V1.1) [!].gb");
 
 }
 
@@ -68,6 +70,29 @@ Application::~Application()
 	CloseWindow();
 
 }
+
+static int scale = 5;
+
+
+
+void Application::display_tile(RenderTexture2D texture, uint16_t startLocation, uint16_t tileNum, int x, int y)
+{
+	Color gameBoyColors[] = {WHITE, LIGHTGRAY, DARKGRAY, BLACK};
+
+	for(int lineY = 0; lineY < 16; lineY += 2)
+	{
+		uint8_t lo = emu.read(startLocation + (tileNum * 16) + lineY);
+		uint8_t hi = emu.read(startLocation + (tileNum * 16) + lineY + 1);
+
+		for(int8_t bit = 7; bit >= 0; bit--)
+		{
+			uint8_t color = !!(lo & (1 << bit)) | (!!(hi & (1 << bit)) << 1);
+
+			DrawPixel(x + (7 - bit), y + lineY / 2, gameBoyColors[color]);
+		}
+	}
+}
+
 
 void Application::DrawRegisters()
 {
@@ -180,7 +205,6 @@ std::string Application::CondTypeToString(CPU::CondType cond)
     }
 }
 
-
 void Application::Run()
 {
 	while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -245,9 +269,6 @@ void Application::Run()
 		ImGui::Text("SP: 0x%x", emu.cpu.SP);
 		ImGui::Text("PC: 0x%x", emu.cpu.PC);
 		ImGui::Text("Cycles: %d", emu.m_SystemTicks);
-
-		
-
 
 		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImGui::GetStyleColorVec4(ImGuiCol_FrameBg));
 
@@ -322,6 +343,16 @@ void Application::Run()
 		
 		// Update
 
+		//tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
+
+
+
+		ImGui::Begin("TileMap");
+
+		ImGui::Image(tileMapTexture.texture.id, {24 * 8 * scale, 16 * 8 * scale}, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+		ImGui::End();
+
 
 
 		// if(msg[0])
@@ -356,16 +387,43 @@ void Application::Run()
 
 		if(emu_run) emu.UpdateFrame();
 
+
+
+		DrawTiles();
+
 		ImGui::Render();
 		BeginDrawing();
 		ImGui_ImplRaylib_RenderDrawData(ImGui::GetDrawData());
 		EndDrawing();
+
+		BeginTextureMode(tileMapTexture);
+		ClearBackground(BLUE);
+		uint16_t tileNum = 0;
+
+	
+
+		for(int y = 0; y < 16; y++)
+		{
+			for(int x = 0; x < 24; x++)
+			{
+				display_tile(tileMapTexture, 0x8000, tileNum++, x * 8, y * 8);
+			}
+		}
+
+
+		
+		EndTextureMode();
 
 		BeginTextureMode(renderTexture);
 		ClearBackground(RAYWHITE);
 		DrawText("hello", 0, 0, 5, GREEN);
 
 		EndTextureMode();
+
+
+
+
+
 	}
 
 }

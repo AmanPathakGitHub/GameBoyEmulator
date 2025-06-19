@@ -27,19 +27,7 @@ Cartridge::Cartridge(const std::string& filename)
 
 uint8_t Cartridge::ReadCart(uint16_t address)
 {
-
-	if(address < 0x4000)
-		return m_CartData[address];
-	else if (address < 0x8000)
-	{
-		// memory banking
-		return m_CartData[address];
-	}
-
-
-
-	return 0;
-
+	return m_CartData[address];
 }
 
 void Cartridge::WriteCart(uint16_t address, uint8_t data)

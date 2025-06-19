@@ -7,10 +7,21 @@ Emulator::Emulator()
 	cpu.Reset();
 	cpu.ConnectCPUToBus(this);
 
+	timer.ConnectTimerToCPU(&cpu);
+	dma.ConnectToEmulator(this);
+
 
 
 	for (int i = 0; i < memory.size(); i++)
 		memory[i] = 0x00;
+
+	
+	for (int i = 0; i < wram.size(); i++)
+		wram[i] = 0x00;
+
+	
+	for (int i = 0; i < hram.size(); i++)
+		hram[i] = 0x00;
 	
 	// memory[0x100] = 0x78; // LD A, B
 	// memory[0x101] = 0x41; // LD B, C
@@ -33,6 +44,37 @@ Emulator::Emulator()
 	// memory[0x100] = 0x03; // INC BC
 	// memory[0x101] = 0x14; // INC D
 	// memory[0x102] = 0x35; // DEC (HL)
+
+	// memory[0x100] = 0x33; 
+	// memory[0x101] = 0x3B; 
+	// memory[0x102] = 0x39; 
+	// memory[0x103] = 0xF9;
+	// memory[0x104] = 0xE8;
+	// memory[0x105] = 0x1; 
+	// memory[0x106] = 0xE8;
+	// memory[0x107] = 0xFF;
+	// memory[0x108] = 0xF8;
+	// memory[0x109] = 0x1;
+	// memory[0x10A] = 0xF8;
+	// memory[0x10B] = 0xFF; 
+ 
+ 
+	memory[0x100] = 0x8F; // ADC A, A
+	memory[0x101] = 0x88; // ADC A, B
+	memory[0x102] = 0x99; // SBC A, C
+	memory[0x103] = 0x9A; // SBC A, D
+
+	// // Initialize registers and flags
+	// cpu.AF.hi = 0x14;    // A = 0x14
+	// cpu.BC.hi = 0xFF;    // B = 0xFF
+	// cpu.BC.lo = 0x02;    // C = 0x02
+	// cpu.DE.hi = 0x03;    // D = 0x03
+
+	// cpu.SetFlag(FLAG_C, 1); // Set carry flag for ADC/SBC
+
+	// cpu.PC = 0x100;
+ 
+
 
 	serial_data[0] = 0;
 	serial_data[1] = 0;	
@@ -68,9 +110,6 @@ Emulator::Emulator()
 	memory[0xFF4A] = 0x00;
 	memory[0xFF4B] = 0x00;
 	memory[0xFFFF] = 0x00; // IE
-
-		
-
 
 }
 
@@ -116,7 +155,15 @@ void Emulator::UpdateFrame()
 
 void Emulator::clock()
 {
+	
 	cpu.Clock();
+	
+	for(int i = 0; i <= 4; i++)
+		timer.tick(); // maybe pass in cpu to timer tick?
+
+	if(dma.isTransferring())
+		dma.Tick();
+	
 	m_SystemTicks++;
 }
 
@@ -130,52 +177,106 @@ void Emulator::clock_complete()
 
 }
 
+uint8_t ly = 0;
+
 uint8_t Emulator::read(uint16_t address)
 {
+	//std::cout << "READ: " <<  (int)address << std::endl;
 
-	if(address < 0 || address >= 0x10000) exit(-1);
+	if(address == 0xFF44) return ly++;
 
-	if(address == 0xFF44) return 0x90;
-
-	if (address < 0x8000)
+	if (address < 0x8000) {
 		return cartridge->ReadCart(address);
-	else if (address > 0xE000 && address < 0xFDFF)
-		return memory[address - 0x2000]; // MIRRORING
-	else if (address > 0xFF00 && address < 0xFF80)
-	{
-		// io read
-		if(address == 0xFF01) return serial_data[0];
-		else if(address == 0xFF02) return serial_data[1];
-	}
-	else if (address == 0xFF0F) return cpu.int_flag;
-	else if(address == 0xFFFF) return cpu.int_enable;
+	} else if (address < 0xA000) {
+		//PPU/VRAM
+		return ppu.VRAM_read(address);
+    } else if (address < 0xC000) {
+        //Cartridge RAM
+        return cartridge->ReadCart(address);
+    } else if (address < 0xE000) {
+        //WRAM (Working RAM)
+        return wram[address - 0xC000];
+    } else if (address < 0xFE00) {
+        //reserved echo ram...
+        return 0;
+    } else if (address < 0xFEA0) {
+        //OAM
+		if(dma.isTransferring()) return 0xFF;
+        return ppu.OAM_read(address);
+    } else if (address < 0xFF00) {
+        //reserved unusable...
+        return 0;
+    } else if (address < 0xFF80) {
+        //IO Registers...
+        //TODO
+		if (address == 0xFF01) {
+        	return serial_data[0];
+   		 }
 
+    	if (address == 0xFF02) {
+        	return serial_data[1];
+    	}
 
-	
-	return memory[address];
+	 	if (address >= 0xFF04 && address <= 0xFF07) 
+			return timer.read(address);
+
+		if(address == 0xFF0F)
+			return cpu.int_flag;
+
+		return 0;
+ 
+		//NO_IMPL
+    } else if (address == 0xFFFF) {
+        //CPU ENABLE REGISTER...
+        //TODO
+        return cpu.int_enable;
+    }
+
+    //NO_IMPL
+    return hram[address - 0xFF80];	
 }
 
 void Emulator::write(uint16_t address, uint8_t data)
 {
+	//std::cout << "WRITE: " <<  (int)address << std::endl;
 
-	if(address < 0 || address >= 0x10000) exit(-1);
-
-	if (address < 0x8000)
-	{
-		cartridge->WriteCart(address, data);
-	}
-	else if (address > 0xE000 && address < 0xFDFF)
-		memory[address - 0x2000] = data; // MIRRORING
-	else if (address > 0xFF00 && address < 0xFF80)
-	{
+	if (address < 0x8000) {
+        //ROM Data
+        cartridge->WriteCart(address, data);
+    } else if (address < 0xA000) {
+		ppu.VRAM_write(address, data);
+    } else if (address < 0xC000) {
+        //EXT-RAM
+        cartridge->WriteCart(address, data);
+    } else if (address < 0xE000) {
+        //WRAM
+        wram[address - 0xC000] = data;
+    } else if (address < 0xFE00) {
+        //reserved echo ram
+    } else if (address < 0xFEA0) {
+		//OAM
+		if(dma.isTransferring()) return;
+		ppu.OAM_write(address, data);
+    } else if (address < 0xFF00) {
+        //unusable reserved
+    } else if (address < 0xFF80) {
+        //IO Registers...
+        //TODO
 		if (address == 0xFF01)  serial_data[0] = data;
 		else if (address == 0xFF02) serial_data[1] = data;
-	}
-	else if (address == 0xFF0F) cpu.int_flag = data;
-	else if(address == 0xFFFF) cpu.int_enable = data;
-
-	memory[address] = data;
+		else if (address >= 0xFF04 && address <= 0xFF07) timer.write(address, data);
+		else if(address == 0xFF46) dma.StartTransfer(data);
+		else if(address == 0xFF0F) cpu.int_flag = data;
+        
+    } else if (address == 0xFFFF) {
+        //CPU SET ENABLE REGISTER
+        
+        cpu.int_enable = data;
+    } else {
+        hram[address - 0xFF80] = data;
+    }
 }
+
 
 uint16_t Emulator::read16(uint16_t address)
 {

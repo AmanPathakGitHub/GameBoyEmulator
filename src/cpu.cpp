@@ -83,24 +83,18 @@ void CPU::Reset()
 	// but apparently thats illegal to have so we just skip it
 
 
-	for(int hi = 0; hi <= 0xF; hi++)
-	{
-		for(int lo = 0; lo <= 0xF; lo++)
-		{
+	// for(int hi = 0; hi <= 0xF; hi++)
+	// {
+	// 	for(int lo = 0; lo <= 0xF; lo++)
+	// 	{
 			
-			int opcode = (hi << 4) | lo;
-			if(opcode == 0xCB) continue;
-			std::cout << dissassembleInstr(InstructionByOpcode(opcode), opcode);
-		}
-		std::cout << std::endl;
-	}
+	// 		int opcode = (hi << 4) | lo;
+	// 		if(opcode == 0xCB) continue;
+	// 		std::cout << dissassembleInstr(InstructionByOpcode(opcode), opcode);
+	// 	}
+	// 	std::cout << std::endl;
+	// }
 }
-
-#define INT_VBLANK 0b1
-#define INT_LCD 0b10
-#define INT_TIMER 0b100
-#define INT_SERIAL 0b1000
-#define INT_JOYPAD 0b10000
 
 
 
@@ -127,25 +121,28 @@ void CPU::Clock()
 		
 		if (m_Cycles == 0)
 		{
-			// execute new instruction and update cycle count to tell it to wait
 			
 			if (ime_enabling) {
         		int_master_enabled = true;
         		ime_enabling = false;
   			}
-			debug_file << std::format("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n"
-				, AF.hi, AF.lo, BC.hi, BC.lo, DE.hi, DE.lo, HL.hi, HL.lo, SP, PC, emu->read(PC), emu->read(PC + 1), emu->read(PC + 2), emu->read(PC + 3));
-			std::vector<std::string> d = Application::dissassemble(*emu, PC, PC + 5);
+
+			//if(PC == 0xC06C) __debugbreak();
+
+			// debug_file << std::format("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n"
+			// 	, AF.hi, AF.lo, BC.hi, BC.lo, DE.hi, DE.lo, HL.hi, HL.lo, SP, PC, emu->read(PC), emu->read(PC + 1), emu->read(PC + 2), emu->read(PC + 3));
+			// std::vector<std::string> d = Application::dissassemble(*emu, PC, PC + 5); // this is wrong???
 			uint8_t opcode = emu->read(PC++);			
 			// debug_file << d[0] <<
 			//  " Z: " << (int)GetFlag(FLAG_Z) << " C: " << (int)GetFlag(FLAG_C) << " N: " <<  (int)GetFlag(FLAG_N) << " H: " <<  (int)GetFlag(FLAG_H) 
 			//  << " AF: 0x" << std::hex << (int)AF.reg << " BC: 0x" << std::hex << (int)BC.reg << " DE: 0x" << std::hex << (int)DE.reg << " HL: 0x" << std::hex << (int)HL.reg 
 			//  << " SP: 0x" << std::hex << (int)SP 
 			//  << "\n";
-
 			
 			
 			m_CurrentInstruction = InstructionByOpcode(opcode);
+			if(opcode == 0xCB) PC++; // temporary
+
 
 			// if(m_CurrentInstruction.name == "XXX")
 			// 	std::cout << "UNHANDLED OPCODE " << (int)opcode << std::endl;
@@ -161,6 +158,13 @@ void CPU::Clock()
 
 		
 	}
+
+	// static int lastVal = 0;
+	// if(emu->read(0xFF80) != lastVal)
+	// {
+	// 	std::cout << (int)emu->read(0xFF80) << std::endl;
+	// 	lastVal = emu->read(0xFF80);
+	// }
 }
 
 
@@ -178,6 +182,11 @@ bool CPU::CheckInterrupt(uint8_t interupt_type, uint16_t address)
 		return true;
 	}
 	return false;
+}
+
+void CPU::RequestInterrupt(uint8_t interrupt_type)
+{
+	int_flag |= interrupt_type;
 }
 
 uint8_t CPU::GetFlag(uint8_t flag)
@@ -258,13 +267,16 @@ void CPU::writeOperand8(Operand& op, uint8_t value)
 	switch (op.mode)
 	{
 	case REG8:
+
 		writeRegister8(op.reg, value);
 		break;
 	case IND: // pretty sure we can only indirectly write a single byte so this part isnt in writeoperand16
-		if(op.reg == RegType::HLI) HL.reg++;
-		else if (op.reg == RegType::HLD) HL.reg--;
+
 
 		emu->write(getRegisterValue(op.reg), value);
+
+		if(op.reg == RegType::HLI) HL.reg++;
+		else if (op.reg == RegType::HLD) HL.reg--;
 
 		break;
 	case IND_IMM8: // only used for LD (a8), A. see for more info
@@ -280,6 +292,12 @@ void CPU::writeOperand8(Operand& op, uint8_t value)
 		emu->write(address, value);
 	}
 		break;
+	case IND_REG8:
+	{
+		uint16_t address = 0xFF00 | getRegisterValue(op.reg);
+		emu->write(address, value);
+	}
+	break;
 	default:
 		std::cout << "INVALID WRITE 8" << std::endl;
 		break;
@@ -321,7 +339,6 @@ uint16_t CPU::getRegisterValue(RegType type)
 	case RegType::AF: return AF.reg;
 	case RegType::BC: return BC.reg;
 	case RegType::DE: return DE.reg;
-	
 	case RegType::HLI:
 	case RegType::HLD:
 	case RegType::HL: return HL.reg;
@@ -337,7 +354,7 @@ uint16_t CPU::fetch(const Operand& operand)
 	switch (operand.mode)
 	{
 	case REG8:
-		return getRegisterValue(operand.reg);
+		return getRegisterValue(operand.reg) & 0Xff;
 	case REG16:
 		return getRegisterValue(operand.reg);
 	case IND:
@@ -370,6 +387,11 @@ uint16_t CPU::fetch(const Operand& operand)
 		uint8_t value = emu->read(address);
 		return value;
 	}
+	case IND_REG8:
+	{
+		uint16_t address = 0xFF00 | getRegisterValue(operand.reg);
+		return emu->read(address);
+	}
 	default:
 		std::cout << "INVALID ADDRESSING MODE" << std::endl;
 		return -1;
@@ -377,18 +399,13 @@ uint16_t CPU::fetch(const Operand& operand)
 }
 
 // FULL DESCENDING STACK
-
-
 void CPU::cpu_push(uint8_t byte)
 {
-	//std::cout << "PUSHED " << (int)byte << std::endl;
 	emu->write(--SP, byte);
 }
 
 uint8_t CPU::cpu_pop()
 {
-	//std::cout << "POPPED " << (int)emu->read(SP) << std::endl;
-
 	return emu->read(SP++);
 }
 
@@ -434,7 +451,7 @@ void CPU::LD_HL_SP()
 {
 	// this is specific no need to use the abstracted functions
 
-	uint8_t value = emu->read(PC++);
+	int8_t value = fetch(m_CurrentInstruction.operand1) & 0xFF;
 	HL.reg = SP + value;
 
 	SetFlag(FLAG_Z, 0);
@@ -496,7 +513,6 @@ void CPU::ADD()
 		uint32_t temp = (uint32_t)value1 + (uint32_t)value2;
 		uint16_t result = (uint16_t)temp;
 		SetFlag(FLAG_C, temp > 0xFFFF);
-		SetFlag(FLAG_Z, result == 0);
 		SetFlag(FLAG_N, 0);
 		SetFlag(FLAG_H, ((value1 & 0xFFF) + (value2 & 0xFFF)) > 0xFFF);
 		writeOperand16(m_CurrentInstruction.operand1, result);
@@ -513,31 +529,46 @@ void CPU::ADD()
 	}
 }
 
+void CPU::ADD_SP()
+{
+	int8_t value = fetch(m_CurrentInstruction.operand1); // signed 8-bit
+	uint16_t sp = SP;
+	uint16_t result = sp + value;
+
+	SetFlag(FLAG_Z, 0); // Always cleared
+	SetFlag(FLAG_N, 0); // Always cleared
+
+	SetFlag(FLAG_H, ((sp & 0xF) + (value & 0xF)) > 0xF);
+	SetFlag(FLAG_C, ((sp & 0xFF) + (value & 0xFF)) > 0xFF);
+
+	SP = result;
+}
+
 void CPU::ADC()
 {
 	uint16_t value1 = fetch(m_CurrentInstruction.operand1);
 	uint16_t value2 = fetch(m_CurrentInstruction.operand2);
+	uint8_t carry = GetFlag(FLAG_C);
 	
 	if(Is16Bit(m_CurrentInstruction.operand1))
 	{
-		uint32_t temp = (uint32_t)value1 + (uint32_t)value2 + (uint32_t)GetFlag(FLAG_C);
-		uint16_t result = (uint16_t)result;
+		uint32_t temp = (uint32_t)value1 + (uint32_t)value2 + (uint32_t)carry;
+		uint16_t result = result & 0xFFFF;
 		
 		SetFlag(FLAG_C, temp > 0xFFFF);
-		SetFlag(FLAG_Z, result == 0);
 		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xFFF) + (value2 & 0xFFF)) > 0xFFF);
+		SetFlag(FLAG_H, ((value1 & 0xFFF) + (value2 & 0xFFF) + carry) > 0xFFF);
 
 		writeOperand16(m_CurrentInstruction.operand1, result);
 	}
 	else
 	{
-		uint16_t temp = value1 + value2 + GetFlag(FLAG_C);
-		uint8_t result = (uint8_t)temp;
+		uint16_t temp = value1 + value2 + carry;
+		uint8_t result = temp & 0xFF;
 		SetFlag(FLAG_C, temp > 0xFF);
 		SetFlag(FLAG_Z, result == 0);
 		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xF) + (value2 & 0xF)) > 0xF);
+		SetFlag(FLAG_H, ((value1 & 0xF) + (value2 & 0xF) + carry > 0xF));
 		writeOperand8(m_CurrentInstruction.operand1, result);
 	}
 }
@@ -561,13 +592,15 @@ void CPU::SBC()
 {
 	uint8_t value1 = fetch(m_CurrentInstruction.operand1);
 	uint8_t value2 = fetch(m_CurrentInstruction.operand2);
+	uint8_t carry = GetFlag(FLAG_C);
 	
-	uint16_t temp = (uint16_t)value1 - (uint16_t)value2 - (uint16_t)GetFlag(FLAG_C);
-	uint8_t result = (uint8_t)temp;
-	SetFlag(FLAG_C, value1 < value2);
+	uint16_t temp = value1 - value2 - carry;
+	uint8_t result = temp & 0xFF;
+
+	SetFlag(FLAG_C, (int16_t)temp < 0);
 	SetFlag(FLAG_Z, result == 0);
 	SetFlag(FLAG_N, 1);
-	SetFlag(FLAG_H, (value1 & 0xF) < (value2 & 0xF));
+	SetFlag(FLAG_H, (value1 & 0xF) - (value2 & 0xF) - carry < 0);
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
 }
@@ -579,7 +612,7 @@ void CPU::AND()
 	SetFlag(FLAG_Z, AF.hi == 0);
 	SetFlag(FLAG_N, 0);
 	SetFlag(FLAG_H, 1);
-	SetFlag(FLAG_C, 0); 
+	SetFlag(FLAG_C, 0);
 }
 
 void CPU::XOR()
@@ -778,48 +811,54 @@ void CPU::RST()
 
 }
 
-// void CPU::DAA()
-// {
-// 	uint8_t u = 0;
-// 	bool fc = false;
-
-// 	if(GetFlag(FLAG_H) || (!GetFlag(FLAG_N) && (AF.hi & 0xF) > 9))
-// 		u |= 0x06;
-
-// 	if(GetFlag(FLAG_C) || (!GetFlag(FLAG_N) && (AF.hi > 0x99)))
-// 	{
-// 		u |= 0x60;
-// 		fc = 1;
-// 	}
-
-
-// 	AF.hi += GetFlag(FLAG_N) ? -u : u;
-
-// 	SetFlag(FLAG_Z, AF.hi == 0);
-// 	SetFlag(FLAG_H, 0);
-// 	SetFlag(FLAG_C, GetFlag(FLAG_N) ? GetFlag(FLAG_C) : fc);
-
-	
-// }
-
 void CPU::DAA()
 {
+	uint8_t u = 0;
+	bool fc = false;
 
-	if(!GetFlag(FLAG_N))
+	if(GetFlag(FLAG_H) || (!GetFlag(FLAG_N) && (AF.hi & 0xF) > 9))
+		u |= 0x06;
+
+	if(GetFlag(FLAG_C) || (!GetFlag(FLAG_N) && (AF.hi > 0x99)))
 	{
-		if(GetFlag(FLAG_C) || AF.hi > 0x99) {AF.hi += 0x60; SetFlag(FLAG_C, 1);}
-		if(GetFlag(FLAG_H) || (AF.hi & 0x0f) > 0x09) { AF.hi += 0x06;} 	
-	} 
-	else
-	{
-		if(GetFlag(FLAG_C)) {AF.hi -= 0x60;}
-		if(GetFlag(FLAG_H)) {AF.hi -= 0x06;}
+		u |= 0x60;
+		fc = 1;
 	}
 
-	
+	int a = AF.hi;
+
+	if (GetFlag(FLAG_N))
+		a -= u;
+	else
+		a += u;
+
+	AF.hi = static_cast<uint8_t>(a);
+
 	SetFlag(FLAG_Z, AF.hi == 0);
 	SetFlag(FLAG_H, 0);
+	SetFlag(FLAG_C, GetFlag(FLAG_N) ? GetFlag(FLAG_C) : fc);
+
+	
 }
+
+// void CPU::DAA()
+// {
+
+// 	if(!GetFlag(FLAG_N))
+// 	{
+// 		if(GetFlag(FLAG_C) || AF.hi > 0x99) {AF.hi += 0x60; SetFlag(FLAG_C, 1);}
+// 		if(GetFlag(FLAG_H) || (AF.hi & 0x0f) > 0x09) { AF.hi += 0x06;} 	
+// 	} 
+// 	else
+// 	{
+// 		if(GetFlag(FLAG_C)) {AF.hi -= 0x60;}
+// 		if(GetFlag(FLAG_H)) {AF.hi -= 0x06;}
+// 	}
+
+	
+// 	SetFlag(FLAG_Z, AF.hi == 0);
+// 	SetFlag(FLAG_H, 0);
+// }
 
 // void CPU::DAA() {
 //     uint8_t a = AF.hi;
@@ -1058,13 +1097,17 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 	case 0xEA:
 		return {"LD", 4, &CPU::LD, {IND_IMM16}, {REG8, RegType::A}};
 	case 0xE8:
-		return {"ADD", 4, &CPU::ADD, {REG16, RegType::SP}, {IMM8}};
+		return {"ADD SP", 4, &CPU::ADD_SP, {IMM8}};
 	case 0xFA:
 		return {"LD", 4, &CPU::LD, {REG8, RegType::A}, {IND_IMM16}};
 	case 0xE0:
 		return {"LD", 3, &CPU::LD, {IND_IMM8}, {REG8, RegType::A}};
 	case 0xF0:
 		return {"LD", 3, &CPU::LD, {REG8, RegType::A}, {IND_IMM8}};
+	case 0xF2:
+		return {"LD", 2, &CPU::LD, {REG8, RegType::A}, {IND_REG8, RegType::C}};
+	case 0xE2:
+		return {"LD", 2, &CPU::LD, {IND_REG8, RegType::C}, {REG8, RegType::A}};
 	case 0xCD:
 		return {"CALL", 3, &CPU::CALL, {COND, RegType::NONE, CondType::NONE}, {IMM16}};
 	case 0x18:
@@ -1088,7 +1131,7 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 	case 0xDE:
 		return {"SBC", 2, &CPU::SBC, {REG8, RegType::A}, {IMM8}};
 	case 0xF8:
-		return {"LD HL, SP+s8", 3, &CPU::LD_HL_SP}; // probably add operand for imm8
+		return {"LD HL, SP+", 3, &CPU::LD_HL_SP, {IMM8}}; // probably add operand for imm8
 	case 0xF9:
 		return {"LD", 2, &CPU::LD, {REG16, RegType::SP}, {REG16, RegType::HL}};
 	case 0xCB:
@@ -1148,7 +1191,7 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 		}
 		else if ((opcode & 0b11001111) == 0b00001001) // ADD HL, r16
 		{
-			return {"ADD", 2, &CPU::ADD, {REG16, RegType::HL}, DecodeReg16((opcode & 0b0011000) >> 4)};
+			return {"ADD", 2, &CPU::ADD, {REG16, RegType::HL}, DecodeReg16((opcode & 0b00110000) >> 4)};
 		}
 		else if ((opcode & 0b11111000) == 0b10000000) // ADD A, r8 // TODO: change cycle count when using (HL)
 		{
@@ -1239,7 +1282,7 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 
 CPU::Instruction CPU::HandleCBInstruction()
 {
-	uint8_t opcode = emu->read(PC++);
+	uint8_t opcode = emu->read(PC); // TEMPORARY
 
 
 	// TODO: change cycle count for HL

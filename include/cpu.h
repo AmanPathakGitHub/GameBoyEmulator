@@ -15,6 +15,14 @@ class Emulator; // forward declare to avoid circular definition, need to to link
 #define FLAG_N 6
 #define FLAG_Z 7
 
+#define INT_VBLANK 0b1
+#define INT_LCD 0b10
+#define INT_TIMER 0b100
+#define INT_SERIAL 0b1000
+#define INT_JOYPAD 0b10000
+
+
+
 class CPUTest;
 
 class CPU
@@ -28,6 +36,7 @@ public:
 	void Reset();
 	void Clock();
 	bool CheckInterrupt(uint8_t interupt_type, uint16_t address);
+	void RequestInterrupt(uint8_t interrupt_type);
 
 
 	bool halted = false;
@@ -56,6 +65,7 @@ public:
 		IND,				// Indirect
 		IND_IMM8,
 		IND_IMM16,
+		IND_REG8,
 		COND
 	};
 
@@ -91,7 +101,7 @@ public:
 		AddressingMode mode;
 		RegType reg;
 		CondType cond;
-		uint8_t meta; // rst's return address or bit index or anything else encoded into the instruction
+		int meta; // rst's return address or bit index or anything else encoded into the instruction
 	};
 
 
@@ -144,6 +154,7 @@ public:
 	void INC();
 	void DEC();
 	void ADD();
+	void ADD_SP();
 	void SUB();
 	void ADC();
 	void SBC();
