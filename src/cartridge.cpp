@@ -7,6 +7,8 @@ Cartridge::Cartridge(const std::string& filename)
 {
 	std::ifstream ifs(filename, std::ios::binary);
 
+	if(!ifs.good()) std::cout << "ROM NOT FOUND PROPERLY" << std::endl;
+
 	ifs.seekg(0x148); // offset where rom byte is
 	uint8_t rom_byte = 0;
 	ifs.read((char*)&rom_byte, 1);

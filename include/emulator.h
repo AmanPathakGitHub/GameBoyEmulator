@@ -33,6 +33,7 @@ public:
 	CPU cpu; // public just to draw stuff
 	Timer timer;
 	PPU ppu;
+	LCD lcd;
 	DMA dma;
 	
 	std::array<uint8_t, 0x10000> memory;
@@ -40,7 +41,7 @@ public:
 	std::array<uint8_t, 0x2000> wram;
 	std::array<uint8_t, 0x80> hram;
 
-	uint32_t m_SystemTicks = 0;
+	uint64_t m_SystemTicks = 0;
 private:
 	std::unique_ptr<Cartridge> cartridge;
 

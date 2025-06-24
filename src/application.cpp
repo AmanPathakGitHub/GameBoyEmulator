@@ -57,7 +57,7 @@ Application::Application(const ApplicationSettings settings)
 
 	ImGui_ImplRaylib_Init();
 
-	emu.LoadROM("Tetris (JUE) (V1.1) [!].gb");
+	emu.LoadROM("Dr. Mario (World).gb");
 
 }
 
@@ -93,6 +93,11 @@ void Application::display_tile(RenderTexture2D texture, uint16_t startLocation, 
 	}
 }
 
+void Application::DrawTiles()
+{
+
+
+}
 
 void Application::DrawRegisters()
 {

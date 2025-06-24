@@ -9,8 +9,7 @@ Emulator::Emulator()
 
 	timer.ConnectTimerToCPU(&cpu);
 	dma.ConnectToEmulator(this);
-
-
+	ppu.ConnectLCD(&lcd);
 
 	for (int i = 0; i < memory.size(); i++)
 		memory[i] = 0x00;
@@ -143,24 +142,19 @@ void Emulator::UpdateFrame()
 		}
 	}
 
-	if(!msg.empty())
-	{
-		// std::cout << msg << std::endl;
-		// std::cout << std::flush;
-	}
-
-
 	
 }
 
 void Emulator::clock()
 {
-	
+	// using M-cycles	
 	cpu.Clock();
 	
 	for(int i = 0; i <= 4; i++)
+	{
 		timer.tick(); // maybe pass in cpu to timer tick?
-
+	}
+		
 	if(dma.isTransferring())
 		dma.Tick();
 	
@@ -222,6 +216,8 @@ uint8_t Emulator::read(uint16_t address)
 
 		if(address == 0xFF0F)
 			return cpu.int_flag;
+		
+		
 
 		return 0;
  
@@ -256,6 +252,7 @@ void Emulator::write(uint16_t address, uint8_t data)
     } else if (address < 0xFEA0) {
 		//OAM
 		if(dma.isTransferring()) return;
+		
 		ppu.OAM_write(address, data);
     } else if (address < 0xFF00) {
         //unusable reserved

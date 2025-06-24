@@ -101,7 +101,7 @@ void CPU::Reset()
 void CPU::Clock()
 {	
 
-	    // Wake up from HALT if any interrupt is pending (even if IME is off)
+	// Wake up from HALT if any interrupt is pending (even if IME is off)
     if (halted && (int_enable & int_flag)) {
         halted = false;
         // But don't service the interrupt this frame unless IME is enabled
