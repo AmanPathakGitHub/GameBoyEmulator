@@ -11,6 +11,8 @@
 #include <rlImGui.h>
 #include <imgui_impl_raylib.h>
 
+Application* context; // for debug use ONLY
+
 
 Application::Application(const ApplicationSettings settings)
 	: m_ScreenWidth(settings.screenWidth), m_ScreenHeight(settings.screenHeight), m_TitleName(settings.TitleName)
@@ -20,6 +22,8 @@ Application::Application(const ApplicationSettings settings)
 		SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 
 	InitWindow(settings.screenWidth, settings.screenHeight, settings.TitleName);
+
+	context = this;
 
 	///*
 	//	Different FPS?
@@ -32,7 +36,7 @@ Application::Application(const ApplicationSettings settings)
 	//*/
 	SetTargetFPS(60); 
 
-	renderTexture = LoadRenderTexture(160, 144);
+	renderTexture = LoadRenderTexture(RESX, RESY);
 	tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
 
 
@@ -57,7 +61,8 @@ Application::Application(const ApplicationSettings settings)
 
 	ImGui_ImplRaylib_Init();
 
-	emu.LoadROM("Dr. Mario (World).gb");
+	//emu.LoadROM("Asteroids (USA, Europe).gb");
+	emu.LoadROM("dmg-acid2.gb");
 
 }
 
@@ -229,7 +234,7 @@ void Application::Run()
 				if (ImGui::MenuItem("Open")) {
 					// Handle Open action
 				}
-				
+
 				ImGui::EndMenu();
 			}
 
@@ -245,14 +250,14 @@ void Application::Run()
 		}
 
 		ImGui::Begin("Emulator");
-	/*	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 3);
-		ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 3);*/
+		/*	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 3);
+			ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 3);*/
 		ImVec2 windowSize = ImGui::GetContentRegionAvail();
 
 		float scale = std::min(windowSize.x / renderTexture.texture.width, windowSize.y / renderTexture.texture.height);
 
 		ImVec2 scaledSize = ImVec2(renderTexture.texture.width * scale, renderTexture.texture.height * scale);
-		
+
 		ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + (windowSize.x - scaledSize.x) / 2, ImGui::GetCursorPosY() + (windowSize.y - scaledSize.y) / 2));
 
 		ImGui::Image((ImTextureID)renderTexture.texture.id, scaledSize, ImVec2(0, 1), ImVec2(1, 0));
@@ -306,7 +311,7 @@ void Application::Run()
 
 			while (clipper.Step())
 			{
-				for (int i =  clipper.DisplayStart * 16; i < clipper.DisplayEnd * 16; i += 16)
+				for (int i = clipper.DisplayStart * 16; i < clipper.DisplayEnd * 16; i += 16)
 				{
 
 
@@ -320,7 +325,7 @@ void Application::Run()
 					if (i == searchNumber)
 					{
 						ImGui::TextColored(ImVec4(1, 1, 0, 1), "0x%04X %s", i, text.c_str());
-						
+
 					}
 					else
 						ImGui::Text("0x%04X %s", i, text.c_str());
@@ -338,14 +343,14 @@ void Application::Run()
 
 		ImGui::Begin("Disassembly");
 
-		std::vector<std::string> dissassemblylines = dissassemble(emu, emu.cpu.PC, emu.cpu.PC + 15);
+		std::vector<std::string> dissassemblylines = dissassemble(emu, emu.cpu.PC - 10, emu.cpu.PC + 15);
 
-		for(std::string l : dissassemblylines)
+		for (std::string l : dissassemblylines)
 			ImGui::Text(l.c_str());
 
 		ImGui::End();
 
-		
+
 		// Update
 
 		//tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
@@ -354,7 +359,7 @@ void Application::Run()
 
 		ImGui::Begin("TileMap");
 
-		ImGui::Image(tileMapTexture.texture.id, {24 * 8 * scale, 16 * 8 * scale}, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+		ImGui::Image(tileMapTexture.texture.id, { 24 * 8 * scale, 16 * 8 * scale }, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 
 		ImGui::End();
 
@@ -372,25 +377,29 @@ void Application::Run()
 		else if (IsKeyPressed(KeyboardKey(KEY_R)))
 		{
 			emu.cpu.Reset();
-		} 
+		}
 		else if (IsKeyPressed(KEY_SPACE))
 		{
-			emu_run  = !emu_run;
+			emu_run = !emu_run;
 		}
 		else if (IsKeyPressed(KEY_P))
 		{
-			for(int i = 0; i < 100; i++)
-				emu.clock(); 
+			for (int i = 0; i < 100; i++)
+				emu.clock();
 		}
 		else if (IsKeyPressed(KEY_K))
 		{
-			for(int i = 0; i < 20; i++)
-				emu.clock(); 
+			for (int i = 0; i < 20; i++)
+				emu.clock();
+		}
+		else if (IsKeyPressed(KEY_S))
+		{
+			
 		}
 
 
 
-		if(emu_run) emu.UpdateFrame();
+		if (emu_run) emu.UpdateFrame();
 
 
 
@@ -401,27 +410,36 @@ void Application::Run()
 		ImGui_ImplRaylib_RenderDrawData(ImGui::GetDrawData());
 		EndDrawing();
 
+
 		BeginTextureMode(tileMapTexture);
 		ClearBackground(BLUE);
 		uint16_t tileNum = 0;
 
-	
 
-		for(int y = 0; y < 16; y++)
+		for (int y = 0; y < 16; y++)
 		{
-			for(int x = 0; x < 24; x++)
+			for (int x = 0; x < 24; x++)
 			{
 				display_tile(tileMapTexture, 0x8000, tileNum++, x * 8, y * 8);
 			}
 		}
 
-
-		
 		EndTextureMode();
 
+
 		BeginTextureMode(renderTexture);
-		ClearBackground(RAYWHITE);
-		DrawText("hello", 0, 0, 5, GREEN);
+
+		Color defaultColor[4] = { WHITE, LIGHTGRAY, DARKGRAY, BLACK };
+		//Color defaultColor[4] = { {155, 188, 15, 255}, {139, 172, 15, 255}, {48, 98, 48, 255}, {15, 56, 15, 255} };
+		for (int y = 0; y < 144; y++)
+		{
+			for (int x = 0; x < 160; x++)
+			{
+				uint8_t colorData = emu.ppu.videoBuffer[y * RESX + x];
+				DrawPixel(x, y, defaultColor[colorData]);
+			}
+		}
+
 
 		EndTextureMode();
 

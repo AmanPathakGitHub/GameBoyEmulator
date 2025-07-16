@@ -2,6 +2,12 @@
 
 #include <cstdint>
 #include <queue>
+#include <raylib.h>
+#include <array>
+#include "cpu.h"
+
+static const int RESX = 160;
+static const int RESY = 144;
 
 struct OAMEntry
 {
@@ -9,12 +15,18 @@ struct OAMEntry
     uint8_t x;
     uint8_t tile_index;
 
-    unsigned f_palette : 3;
-    unsigned f_bank : 1;
-    unsigned f_dmg_pallete : 1;
-    unsigned f_xflip : 1;
-    unsigned f_yflip: 1;
-    unsigned f_priority : 1;
+    uint8_t f_palette : 3;      // CGB ONLY
+    uint8_t f_bank : 1;         // CGB ONLY
+    uint8_t f_dmg_pallete : 1;
+    uint8_t f_xflip : 1;
+    uint8_t f_yflip: 1;
+    uint8_t f_priority : 1;
+};
+
+struct Sprite // USELESS NOW
+{
+    OAMEntry spriteData;
+    uint8_t spriteHeight = 8;
 };
 
 class Emulator;
@@ -25,7 +37,7 @@ public:
     void ConnectToEmulator(Emulator* emu);
     void StartTransfer(uint8_t value);
     void Tick();
-    inline bool isTransferring() { return transferring; }
+    inline bool isTransferring() const { return transferring; }
 private:
     Emulator* emu;
     bool transferring = false;
@@ -59,7 +71,8 @@ struct LCD
     void write(uint16_t address, uint8_t data);
     void ConnectToEmulator(Emulator* emu);
     inline bool GetStatusBit(uint8_t statusType) { return !!(status & statusType); }
-    inline bool GetControlBit(uint8_t controlType) { return !!(lcdc & controlType); }
+    void SetStatusBit(uint8_t statusType, uint8_t set);
+    inline bool GetControlBit(uint8_t controlType) const { return !!(lcdc & controlType); }
 
     Emulator* emu;
 
@@ -73,13 +86,21 @@ struct LCD
     uint8_t windowY;
     uint8_t windowX;
 
+    uint8_t bgp;
+    uint8_t obp0;
+    uint8_t obp1;
+
+    void IncrementLY();
+    uint8_t GetColor(uint8_t index, uint8_t pallete);
+
 };  
 
-struct Pixel
+struct OBJPixel
 {
+    bool exists = false; // whether a sprite pixels exists in the array or not
     uint8_t color;
     uint8_t pallete;
-    uint8_t sprite_priority; // for CGB only
+    //uint8_t sprite_priority; // for CGB only
     uint8_t background_priority;
 
 };
@@ -99,7 +120,9 @@ public:
     
     void tick();
 
+    void ConnectCPU(CPU* cpu);
     void ConnectLCD(LCD* lcd);
+    void ConnectToEmulator(Emulator* emu);
 
     enum Mode {
         HBLANK,
@@ -107,21 +130,30 @@ public:
         OAMSCAN,
         DRAWPIXELS
     };
+    
+    uint8_t videoBuffer[RESX * RESY];
+
 
 private:
 
+    CPU* cpu;
     LCD* lcd;
+    Emulator* emu;
     
     OAMEntry oam_ram[40];
     uint8_t vram[0x2000];
 
     Mode mode = OAMSCAN;
+    void SwitchMode(Mode mode);
+
 
     uint16_t dots = 0;
     uint16_t scanline = 0; // this should be the same as ly register?
+	uint16_t scanlineX = 0; // this is the x position in the scanline, used for pixel drawing
+    uint16_t pushedX = 0;
 
 
-    std::vector<OAMEntry> sprite_buffer; 
+    std::vector<Sprite> sprite_buffer;
 
     void HandleModeOAMScan();
     void HandleModeHBLANK();
@@ -129,10 +161,17 @@ private:
     void HandleModeDrawPixels();
 
     // Pixel FIFO
-    std::queue<Pixel> background_pixels;
-    std::queue<Pixel> sprite_pixels;
+    std::queue<uint8_t> background_pixels;
+    std::array<OBJPixel, 160> sprite_pixels;
 
-    uint16_t xPositionCounter = 0;
+    uint8_t fetchedX = 0;
+    uint16_t tileAddress;
+    uint8_t tileLo;
+    uint8_t tileHi;
+
+
+    uint8_t mapX = 0;
+    uint8_t mapY = 0;
 
     enum FetchState {
         GetTile,
@@ -144,7 +183,8 @@ private:
 
     FetchState fetch_state = GetTile;
 
+    void FetchSpritePixels();
     void FetchBackGroundPixels();
-    
+    void PixelRender();
 };
 

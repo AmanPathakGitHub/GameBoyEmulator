@@ -10,6 +10,9 @@ Emulator::Emulator()
 	timer.ConnectTimerToCPU(&cpu);
 	dma.ConnectToEmulator(this);
 	ppu.ConnectLCD(&lcd);
+	ppu.ConnectCPU(&cpu);
+	ppu.ConnectToEmulator(this);
+	lcd.ConnectToEmulator(this);
 
 	for (int i = 0; i < memory.size(); i++)
 		memory[i] = 0x00;
@@ -147,17 +150,25 @@ void Emulator::UpdateFrame()
 
 void Emulator::clock()
 {
-	// using M-cycles	
-	cpu.Clock();
-	
-	for(int i = 0; i <= 4; i++)
+	// using T-cycles	
+
+
+	if (m_SystemTicks % 4 == 0)
 	{
-		timer.tick(); // maybe pass in cpu to timer tick?
-	}
+		cpu.Clock();
+
 		
-	if(dma.isTransferring())
+	}
+	timer.tick(); // maybe pass in cpu to timer tick?
+
+		
+	if (dma.isTransferring())
 		dma.Tick();
-	
+
+	ppu.tick();
+
+
+
 	m_SystemTicks++;
 }
 
@@ -171,13 +182,9 @@ void Emulator::clock_complete()
 
 }
 
-uint8_t ly = 0;
-
 uint8_t Emulator::read(uint16_t address)
 {
 	//std::cout << "READ: " <<  (int)address << std::endl;
-
-	if(address == 0xFF44) return ly++;
 
 	if (address < 0x8000) {
 		return cartridge->ReadCart(address);
@@ -216,6 +223,9 @@ uint8_t Emulator::read(uint16_t address)
 
 		if(address == 0xFF0F)
 			return cpu.int_flag;
+
+		if (address >= 0xFF40 && address <= 0xFF4B)
+			return lcd.read(address);
 		
 		
 
@@ -262,8 +272,9 @@ void Emulator::write(uint16_t address, uint8_t data)
 		if (address == 0xFF01)  serial_data[0] = data;
 		else if (address == 0xFF02) serial_data[1] = data;
 		else if (address >= 0xFF04 && address <= 0xFF07) timer.write(address, data);
-		else if(address == 0xFF46) dma.StartTransfer(data);
-		else if(address == 0xFF0F) cpu.int_flag = data;
+		else if (address == 0xFF0F) cpu.int_flag = data;
+		else if (address >= 0xFF40 && address <= 0xFF4B) lcd.write(address, data);
+
         
     } else if (address == 0xFFFF) {
         //CPU SET ENABLE REGISTER

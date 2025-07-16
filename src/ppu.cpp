@@ -1,14 +1,27 @@
 #include "ppu.h"
 
 #include "emulator.h"
+#include <iostream>
+
+#include <algorithm>
+#include "application.h"
+
+extern Application* context;
 
 PPU::PPU()
 {
-    
+    memset(vram, 0, 0x2000);
+    memset(videoBuffer,0, RESX * RESY);
+    memset(oam_ram, 0, sizeof(OAMEntry) * 40);
+
+    background_pixels = {};
+    sprite_buffer.reserve(10);
+
 }
 
 void PPU::tick()
 {
+
     switch (mode)
     {
     case Mode::OAMSCAN:
@@ -28,48 +41,194 @@ void PPU::tick()
     
     }
 
+    //if (lcd->GetControlBit(LCDC_OBJ_SIZE)) __debugbreak();
+
     dots++;
+
+}
+
+void PPU::ConnectCPU(CPU* cpu)
+{
+    this->cpu = cpu;
 }
 
 void PPU::ConnectLCD(LCD *lcd)
 {
     this->lcd = lcd;
+    lcd->ly = 0;
+    SwitchMode(OAMSCAN); // can't do it in constructor, lcd would be null
+}
+
+void PPU::ConnectToEmulator(Emulator* emu)
+{
+    this->emu = emu;
+}
+
+void PPU::SwitchMode(Mode mode)
+{
+    this->mode = mode;
+    lcd->SetStatusBit(LCD_PPUMODE, mode);
 }
 
 void PPU::HandleModeOAMScan()
 {
-     // search everything on the first dot, and just do nothing until 80 dots
 
     if(dots == 1) 
     {
-        for(OAMEntry oam_sprite : oam_ram)
+        for(OAMEntry& oam_sprite : oam_ram)
         {
+            //if (oam_sprite.tile_index == 101)__debugbreak();
             if(sprite_buffer.size() >= 10) break;
-            if(oam_sprite.x > 0) break;
-            if(!(lcd->ly + 16 >= oam_sprite.y)) break;
-            if(!(lcd->ly + 16 < oam_sprite.y + (lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8))) break;
 
-            sprite_buffer.push_back(oam_sprite);
+            uint8_t spriteHeight = lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8;
+            if (!(lcd->ly + 16 < oam_sprite.y + spriteHeight)) continue;
+            if(oam_sprite.x <= 0) continue;
+            if(!(lcd->ly + 16 >= oam_sprite.y)) continue;
+
+            sprite_buffer.emplace_back(oam_sprite, spriteHeight);
+            
         }
+
+        std::sort(sprite_buffer.begin(), sprite_buffer.end(), [](const Sprite& sprite1, const Sprite& sprite2)
+            {
+                return sprite1.spriteData.x > sprite2.spriteData.x;
+            });
+        
     }
     else if(dots >= 80)
-    {
-        mode = DRAWPIXELS;
+    {        
+        fetchedX = 0;
+        scanlineX = 0;
+        pushedX = 0;
+        fetch_state = GetTile;
+        SwitchMode(DRAWPIXELS);
     }
+
 }
 
 void PPU::HandleModeHBLANK()
 {
+
+    if (dots >= 456)
+    {
+        lcd->IncrementLY();
+
+
+        if (lcd->ly >= RESY)
+        {
+            SwitchMode(VBLANK);
+
+            emu->cpu.RequestInterrupt(INT_VBLANK);
+
+            if (lcd->GetStatusBit(LCD_MODE1)) emu->cpu.RequestInterrupt(INT_LCD);
+
+        } 
+        else
+        {
+            SwitchMode(OAMSCAN);
+            sprite_buffer.clear();
+            if (lcd->GetStatusBit(LCD_MODE2))  emu->cpu.RequestInterrupt(INT_LCD);
+        }
+
+        dots = 0;
+
+    }
+
 }
 
 void PPU::HandleModeVBLANK()
 {
+    if (dots >= 456)
+    {
+        lcd->IncrementLY();
+
+        if (lcd->ly >= 154)
+        {
+            lcd->ly = 0;
+            SwitchMode(OAMSCAN);
+            if (lcd->GetStatusBit(LCD_MODE2)) emu->cpu.RequestInterrupt(INT_LCD);
+        }
+        dots = 0;
+
+    }
+
 }
 
 void PPU::HandleModeDrawPixels()
 {
-    if(dots % 2 == 0)
+
+    if (dots % 2 == 0)
+    {
         FetchBackGroundPixels();
+
+
+    }
+    FetchSpritePixels();
+
+
+
+    PixelRender();
+
+    if (pushedX >= RESX)
+    {
+        SwitchMode(HBLANK);
+
+        while (!background_pixels.empty())
+            background_pixels.pop();
+
+        sprite_pixels.fill({});
+
+        emu->cpu.RequestInterrupt(HBLANK);
+
+        if (lcd->GetStatusBit(LCD_MODE0)) emu->cpu.RequestInterrupt(INT_LCD);
+
+    }   
+}
+
+void PPU::FetchSpritePixels()
+{
+    if (!lcd->GetControlBit(LCDC_OBJ_ENABLE)) return;
+
+    for (int i = 0; i < sprite_buffer.size(); i++)
+    {
+        
+        uint8_t tileHeight = lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8;
+        bool isTallSprite = tileHeight == 16;
+        const OAMEntry& sprite = sprite_buffer[i].spriteData;  
+        
+        int tileY = lcd->ly - (sprite.y - 16);
+
+        if ((sprite.x - 8 <= scanlineX) && tileY >= 0 && tileY < tileHeight)
+        {
+            uint8_t tileIndex = sprite.tile_index;
+
+            if (isTallSprite) tileIndex &= ~(1); // Index can only be even numbers when using 8x16
+
+            if (sprite.f_yflip)
+                tileY = tileHeight - 1 - tileY;                
+           
+
+            uint16_t tileAddress = 0x8000 + (tileIndex * 16) + (tileY * 2);
+
+            uint8_t lo = emu->read(tileAddress);
+            uint8_t hi = emu->read(tileAddress + 1);
+
+
+            for (int i = 0; i < 8; i++)
+            {
+                uint8_t bit = sprite.f_xflip ? i : 7 - i;
+                uint8_t hiBit = !!(hi & (1 << bit));
+                uint8_t loBit = !!(lo & (1 << bit));
+                
+                uint8_t col = (hiBit << 1) | loBit;
+
+                if(col != 0 && !sprite_pixels[scanlineX + i].exists)
+                    sprite_pixels[scanlineX + i] = OBJPixel{ true, col, (uint8_t)sprite.f_dmg_pallete, (uint8_t)sprite.f_priority };
+            }
+
+           sprite_buffer[i] = {}; // remove from sprite buffer
+        }
+    }
 }
 
 void PPU::FetchBackGroundPixels()
@@ -78,20 +237,112 @@ void PPU::FetchBackGroundPixels()
     {
     case GetTile:
     {
-        uint16_t tileAddress = 0x9800;
 
-        //if(lcd->GetControlBit(LCDC_BG_TILEMAP) && dots)
+        if (lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+        {
+            uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
+
+            uint16_t fetcherX = (lcd->scrollX / 8 + fetchedX) & 0x1F;
+            uint16_t fetcherY = (lcd->scrollY + lcd->ly) & 255;
+
+            tileIndexAddress += fetcherY / 8 * 32 + fetcherX;
+            uint8_t tileIndex = emu->read(tileIndexAddress);
+            tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+            
+        }
+
+
+
+        // else load a sprite tile
+
+        fetchedX++;
+        fetch_state = DataLow;
+       
     }
         break;
     case DataLow:
+
+    {
+        uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
+        tileLo = emu->read(tileAddress + tileY);
+        fetch_state = DataHigh;
+    }
+
+        
         break;
     case DataHigh:
+    {
+        uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
+        tileHi = emu->read(tileAddress + 1 + tileY);
+
+        fetch_state = Sleep;
+    }
+
         break;
     case Sleep:
+        fetch_state = Push;
         break;
     case Push:
+    {
+        if (background_pixels.size() < 8)
+        {
+            //int x = fetchedX * 8 - (8 - (lcd->scrollX % 8));
+
+            for (int i = 7; i >= 0; i--)
+            {
+                uint8_t hi = !!(tileHi & (1 << i));
+                uint8_t lo = !!(tileLo & (1 << i));
+
+                uint8_t col = (hi << 1) | lo;
+
+                if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+                    col = 0;
+    
+                background_pixels.push(lcd->GetColor(col, lcd->bgp));
+
+
+            }
+
+            fetch_state = GetTile;
+        }
+
+    }
         break;    
     }
+
+}
+
+void PPU::PixelRender()
+{
+    // need 8 pixels at least or something
+    if (background_pixels.empty() || lcd->ly >= RESY) return;
+
+    uint8_t color = background_pixels.front();
+    background_pixels.pop();
+
+    
+    OBJPixel spritePixel = sprite_pixels[pushedX];
+
+    if (spritePixel.exists && !(spritePixel.background_priority == 1 && color != 0))
+    {
+
+        uint8_t pallete = spritePixel.pallete ? lcd->obp1 : lcd->obp0;
+        color = lcd->GetColor(spritePixel.color, pallete);
+    }
+            
+    
+    
+    int index = lcd->ly * RESX + pushedX;
+    
+    if (scanlineX >= lcd->scrollX % 8)
+    {
+        videoBuffer[index] = color;
+        pushedX++;
+    }
+    
+    scanlineX++;
+
+
 }
 
 void PPU::OAM_write(uint16_t address, uint8_t data)
@@ -105,7 +356,9 @@ void PPU::OAM_write(uint16_t address, uint8_t data)
 
 uint8_t PPU::OAM_read(uint16_t address)
 {
+
     if(address >= 0xFE00) address -= 0xFE00;
+
 
     uint8_t* oam_bytes = (uint8_t*)oam_ram;
 
@@ -137,9 +390,12 @@ void DMA::Tick()
 {
     uint8_t data = emu->read(currentAddress);
     uint16_t destinationAddress = 0xFE00 | (currentAddress & 0xFF);
-    emu->write(destinationAddress, data);
+    //emu->write(destinationAddress, data);
 
-    transferring = (currentAddress & 0xFF) < 0x9F;
+    emu->ppu.OAM_write(destinationAddress, data);
+
+    //transferring = (currentAddress & 0xFF) < 0x9F;
+    transferring = destinationAddress < 0xFE9F;
     currentAddress++;
 }
 
@@ -153,18 +409,29 @@ LCD::LCD()
     lyc = 0;
     windowX = 0;
     windowY = 0;
+    bgp = 0xFC;
 }
 
 uint8_t LCD::read(uint16_t address)
 {
-    if(address == 0xFF40)
+    if (address == 0xFF40)
         return lcdc;
-    else if (address = 0xFF41)
+    else if (address == 0xFF41)
         return status;
-    else if(address == 0xFF44) // read only
+    else if (address == 0xFF42)
+        return scrollY;
+    else if (address == 0xFF43)
+        return scrollX;
+    else if (address == 0xFF44) // read only
         return ly;
-    else if(address == 0xFF45)
+    else if (address == 0xFF45)
         return lyc;
+    else if (address == 0xFF47)
+        return bgp;
+    else if (address == 0xFF48)
+        return obp0;
+    else if (address == 0xFF49)
+        return obp1;
     else if(address == 0xFF4A) 
         return windowY;
     else if(address == 0xFF4B)
@@ -175,15 +442,67 @@ uint8_t LCD::read(uint16_t address)
 
 void LCD::write(uint16_t address, uint8_t data)
 {
-    if(address == 0xFF40)
+    if (address == 0xFF40)
         lcdc = data;
-    else if(address == 0xFF41)
+    else if (address == 0xFF41)
         status = data;
-    else if(address == 0xFF45)
+    else if (address == 0xFF45)
         lyc = data;
+    else if (address == 0xFF46)
+        emu->dma.StartTransfer(data);
+    else if (address == 0xFF42)
+        scrollY = data;
+    else if (address == 0xFF43)
+        scrollX = data;
+    else if (address == 0xFF47)
+        bgp = data;
+    else if (address == 0xFF48)
+        obp0 = data;
+    else if (address == 0xFF49)
+        obp1 = data;
     else if(address == 0xFF4A) 
         windowY = data;
     else if(address == 0xFF4B)
         windowX = data;
     
+}
+
+void LCD::ConnectToEmulator(Emulator* emu)
+{
+    this->emu = emu;
+}
+
+void LCD::SetStatusBit(uint8_t statusType, uint8_t set)
+{
+    if (statusType == LCD_PPUMODE)
+    {
+        status = (status & ~(0b11)) | set;
+        return;
+    }
+        
+    if (set) status | statusType;
+    else status & ~(statusType);
+}
+
+void LCD::IncrementLY()
+{
+    ly++;
+
+    if (ly == lyc)
+    {
+        SetStatusBit(LCD_LYC_LY, 1);
+
+        if (GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
+    }
+    else
+        SetStatusBit(LCD_LYC_LY, 0);
+}
+
+uint8_t LCD::GetColor(uint8_t index, uint8_t pallete)
+{
+    uint8_t colorID = (pallete & (0b11 << (index * 2))) >> (index * 2);
+
+    uint8_t gb_colors[4] = {0, 1, 2, 3};
+
+    return gb_colors[colorID];
 }

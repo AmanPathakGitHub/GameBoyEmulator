@@ -25,9 +25,11 @@ public:
 	static std::string RegTypeToString(CPU::RegType reg);
 	static std::string CondTypeToString(CPU::CondType cond);
 
+	bool emu_run = false;
+
+
 private:
 	Emulator emu;
-	bool emu_run = false;
 
 	RenderTexture2D renderTexture;
 	RenderTexture2D tileMapTexture;
@@ -44,5 +46,5 @@ private:
 
 	static void WriteParams(Emulator& emu, CPU::Operand& op, std::stringstream& ss, uint16_t& currentAddress);
 
-
 };
+
