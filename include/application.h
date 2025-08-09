@@ -1,10 +1,12 @@
 #pragma once
 #include <cstdint>
-#include <emulator.h>
-
-#include <raylib.h>
+#include "emulator.h"
 
 #include <fstream>
+
+struct GLFWwindow;
+
+#include <raylib.h>
 
 struct ApplicationSettings
 {
@@ -29,20 +31,33 @@ public:
 
 
 private:
+	
+
 	Emulator emu;
 
 	RenderTexture2D renderTexture;
 	RenderTexture2D tileMapTexture;
+	RenderTexture2D tileIndexTexture;
 
 	uint32_t m_ScreenWidth, m_ScreenHeight;
 	const char* m_TitleName;
 
-	void DrawTiles();
+	void ImGuiDraw();
+	void HandleInput();
+
 	void display_tile(RenderTexture2D texture, uint16_t startLocation, uint16_t tileNum, int x, int y);
 
-		
-	void DrawRegisters();
-	void DrawMemory(uint32_t x, uint32_t y, uint16_t startAddress, uint16_t endAddress);
+	bool showDisassembly = false;
+	bool showMemoryView = false;
+	bool showTileMap = false;
+	bool showTileIndexMap = false;
+
+	int tileIndexBaseAddress = 0x8000;
+
+	void ShowMemoryViewText();
+	void ShowDisassemblyText();
+	void ShowTileIndexMap();
+
 
 	static void WriteParams(Emulator& emu, CPU::Operand& op, std::stringstream& ss, uint16_t& currentAddress);
 

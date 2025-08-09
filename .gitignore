@@ -46,8 +46,7 @@ include/divisible/*
 
 .idea/*.xml
 
-build/**/*
-build/*
+build
 
 lib/*
 bin/*
@@ -57,3 +56,4 @@ test/test_runner
 .vscode
 out/*
 CmakeSettings.json
+roms

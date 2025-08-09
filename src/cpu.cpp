@@ -12,6 +12,7 @@
 CPU::CPU()
 {
 	debug_file.open("log2.txt");
+	Reset();
 }
 
 void CPU::ConnectCPUToBus(Emulator* emu)
@@ -65,13 +66,6 @@ std::string dissassembleInstr(CPU::Instruction ins, int opcode )
 
 void CPU::Reset()
 {
-	// AF.reg = 0x01B0;
-	// BC.reg = 0x0013;
-	// DE.reg = 0x00D8;
-	// HL.reg = 0x014D;
-	// SP = 0xFFFE;
-	// PC = 0x100;
-
 	
 	AF.reg = 0x01B0;
 	BC.reg = 0x0013;
@@ -79,6 +73,19 @@ void CPU::Reset()
 	HL.reg = 0x014D;
 	SP = 0xFFFE;
 	PC = 0x100;
+
+	halted = false;
+
+
+	int_master_enabled = false;
+	
+	ime_enabling = false;
+
+	int_enable = 0;
+	int_flag = 0;
+
+	m_Cycles = 0;
+
 	// boot rom would be loaded into memory here
 	// but apparently thats illegal to have so we just skip it
 
@@ -131,14 +138,14 @@ void CPU::Clock()
 
 			// debug_file << std::format("A:{:02X} F:{:02X} B:{:02X} C:{:02X} D:{:02X} E:{:02X} H:{:02X} L:{:02X} SP:{:04X} PC:{:04X} PCMEM:{:02X},{:02X},{:02X},{:02X}\n"
 			// 	, AF.hi, AF.lo, BC.hi, BC.lo, DE.hi, DE.lo, HL.hi, HL.lo, SP, PC, emu->read(PC), emu->read(PC + 1), emu->read(PC + 2), emu->read(PC + 3));
-			// std::vector<std::string> d = Application::dissassemble(*emu, PC, PC + 5); // this is wrong???
+			//std::vector<std::string> d = Application::dissassemble(*emu, PC, PC + 5); // this is wrong???
 			uint8_t opcode = emu->read(PC++);			
-			// debug_file << d[0] <<
-			//  " Z: " << (int)GetFlag(FLAG_Z) << " C: " << (int)GetFlag(FLAG_C) << " N: " <<  (int)GetFlag(FLAG_N) << " H: " <<  (int)GetFlag(FLAG_H) 
-			//  << " AF: 0x" << std::hex << (int)AF.reg << " BC: 0x" << std::hex << (int)BC.reg << " DE: 0x" << std::hex << (int)DE.reg << " HL: 0x" << std::hex << (int)HL.reg 
-			//  << " SP: 0x" << std::hex << (int)SP 
-			//  << "\n";
-			
+			/* debug_file << d[0] <<
+			  " Z: " << (int)GetFlag(FLAG_Z) << " C: " << (int)GetFlag(FLAG_C) << " N: " <<  (int)GetFlag(FLAG_N) << " H: " <<  (int)GetFlag(FLAG_H) 
+			  << " AF: 0x" << std::hex << (int)AF.reg << " BC: 0x" << std::hex << (int)BC.reg << " DE: 0x" << std::hex << (int)DE.reg << " HL: 0x" << std::hex << (int)HL.reg 
+			  << " SP: 0x" << std::hex << (int)SP 
+			  << "\n";
+			*/
 			
 			m_CurrentInstruction = InstructionByOpcode(opcode);
 			if(opcode == 0xCB) PC++; // temporary
@@ -152,6 +159,7 @@ void CPU::Clock()
 
 			// might change to std::function
 			(this->*m_CurrentInstruction.execute)();
+			;
 		}
 
 		m_Cycles--;
@@ -553,7 +561,7 @@ void CPU::ADC()
 	if(Is16Bit(m_CurrentInstruction.operand1))
 	{
 		uint32_t temp = (uint32_t)value1 + (uint32_t)value2 + (uint32_t)carry;
-		uint16_t result = result & 0xFFFF;
+		uint16_t result = temp & 0xFFFF;
 		
 		SetFlag(FLAG_C, temp > 0xFFFF);
 		SetFlag(FLAG_N, 0);
@@ -778,7 +786,7 @@ void CPU::CCF()
 
 void CPU::STOP()
 {
-	halted = true;
+	//halted = true;
 	// should stop LCD display aswell
 }
 

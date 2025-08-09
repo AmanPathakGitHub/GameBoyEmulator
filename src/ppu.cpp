@@ -4,14 +4,11 @@
 #include <iostream>
 
 #include <algorithm>
-#include "application.h"
-
-extern Application* context;
 
 PPU::PPU()
 {
     memset(vram, 0, 0x2000);
-    memset(videoBuffer,0, RESX * RESY);
+    memset(videoBuffer, 0, RESX * RESY);
     memset(oam_ram, 0, sizeof(OAMEntry) * 40);
 
     background_pixels = {};
@@ -19,9 +16,36 @@ PPU::PPU()
 
 }
 
+void PPU::Reset()
+{
+    memset(vram, 0, 0x2000);
+    memset(videoBuffer, 0, RESX * RESY);
+    memset(oam_ram, 0, sizeof(OAMEntry) * 40);
+
+    for (int i = 0; i < sprite_pixels.size(); i++)
+        sprite_pixels[i] = {};
+
+    background_pixels = {};
+    if (lcd != nullptr)
+    {
+        lcd->ly = 0;
+        SwitchMode(OAMSCAN);
+    }
+
+
+    sprite_buffer.clear();
+    
+
+    dots = 0;
+    scanlineX = 0; // this is the x position in the scanline, used for pixel drawing
+    pushedX = 0;
+
+    windowLineCounter = 0;
+
+}
+
 void PPU::tick()
 {
-
     switch (mode)
     {
     case Mode::OAMSCAN:
@@ -40,8 +64,6 @@ void PPU::tick()
         break;
     
     }
-
-    //if (lcd->GetControlBit(LCDC_OBJ_SIZE)) __debugbreak();
 
     dots++;
 
@@ -77,7 +99,6 @@ void PPU::HandleModeOAMScan()
     {
         for(OAMEntry& oam_sprite : oam_ram)
         {
-            //if (oam_sprite.tile_index == 101)__debugbreak();
             if(sprite_buffer.size() >= 10) break;
 
             uint8_t spriteHeight = lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8;
@@ -111,11 +132,12 @@ void PPU::HandleModeHBLANK()
 
     if (dots >= 456)
     {
-        lcd->IncrementLY();
+        IncrementLY();
 
 
         if (lcd->ly >= RESY)
         {
+            windowLineCounter = 0;
             SwitchMode(VBLANK);
 
             emu->cpu.RequestInterrupt(INT_VBLANK);
@@ -140,12 +162,13 @@ void PPU::HandleModeVBLANK()
 {
     if (dots >= 456)
     {
-        lcd->IncrementLY();
+        IncrementLY();
 
         if (lcd->ly >= 154)
         {
             lcd->ly = 0;
             SwitchMode(OAMSCAN);
+            windowTriggered = false;
             if (lcd->GetStatusBit(LCD_MODE2)) emu->cpu.RequestInterrupt(INT_LCD);
         }
         dots = 0;
@@ -160,12 +183,10 @@ void PPU::HandleModeDrawPixels()
     if (dots % 2 == 0)
     {
         FetchBackGroundPixels();
+        FetchSpritePixels();
 
 
     }
-    FetchSpritePixels();
-
-
 
     PixelRender();
 
@@ -178,7 +199,6 @@ void PPU::HandleModeDrawPixels()
 
         sprite_pixels.fill({});
 
-        emu->cpu.RequestInterrupt(HBLANK);
 
         if (lcd->GetStatusBit(LCD_MODE0)) emu->cpu.RequestInterrupt(INT_LCD);
 
@@ -222,6 +242,10 @@ void PPU::FetchSpritePixels()
                 
                 uint8_t col = (hiBit << 1) | loBit;
 
+                uint8_t index = scanlineX + i;
+
+                if (scanlineX + i >= sprite_pixels.size()) break;
+
                 if(col != 0 && !sprite_pixels[scanlineX + i].exists)
                     sprite_pixels[scanlineX + i] = OBJPixel{ true, col, (uint8_t)sprite.f_dmg_pallete, (uint8_t)sprite.f_priority };
             }
@@ -229,6 +253,30 @@ void PPU::FetchSpritePixels()
            sprite_buffer[i] = {}; // remove from sprite buffer
         }
     }
+}
+
+bool PPU::WindowVisible()
+{
+    uint8_t wx = lcd->windowX;
+    uint8_t wy = lcd->windowY;
+
+    return lcd->GetControlBit(LCDC_WINDOW_ENABLE) && wx >= 0 && wx - 7 < RESX && wy >= 0 && wy < RESY;
+}
+
+void PPU::FetchWindowPixels()
+{
+    if (lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
+        return;
+    
+    uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
+
+    uint16_t fetcherX = (fetchedX - (lcd->windowX - 7) / 8) & 0x1F;
+
+    tileIndexAddress += 32 * (windowLineCounter / 8) + fetcherX;
+    uint8_t tileIndex = emu->read(tileIndexAddress);
+
+    tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+
 }
 
 void PPU::FetchBackGroundPixels()
@@ -240,6 +288,7 @@ void PPU::FetchBackGroundPixels()
 
         if (lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
         {
+            // wrap in function
             uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
 
             uint16_t fetcherX = (lcd->scrollX / 8 + fetchedX) & 0x1F;
@@ -248,12 +297,15 @@ void PPU::FetchBackGroundPixels()
             tileIndexAddress += fetcherY / 8 * 32 + fetcherX;
             uint8_t tileIndex = emu->read(tileIndexAddress);
             tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+
+            if (WindowVisible())
+                FetchWindowPixels();
+
+            
             
         }
 
 
-
-        // else load a sprite tile
 
         fetchedX++;
         fetch_state = DataLow;
@@ -286,7 +338,7 @@ void PPU::FetchBackGroundPixels()
     {
         if (background_pixels.size() < 8)
         {
-            //int x = fetchedX * 8 - (8 - (lcd->scrollX % 8));
+            int x = fetchedX * 8 - (8 - (lcd->scrollX % 8));
 
             for (int i = 7; i >= 0; i--)
             {
@@ -297,8 +349,9 @@ void PPU::FetchBackGroundPixels()
 
                 if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
                     col = 0;
-    
-                background_pixels.push(lcd->GetColor(col, lcd->bgp));
+                
+                if(x >= 0)
+                    background_pixels.push(lcd->GetColor(col, lcd->bgp));
 
 
             }
@@ -401,6 +454,11 @@ void DMA::Tick()
 
 LCD::LCD()
 {
+    Reset();
+}
+
+void LCD::Reset()
+{
     lcdc = 0x91;
     status = 0x81;
     scrollX = 0;
@@ -484,18 +542,25 @@ void LCD::SetStatusBit(uint8_t statusType, uint8_t set)
     else status & ~(statusType);
 }
 
-void LCD::IncrementLY()
+void PPU::IncrementLY()
 {
-    ly++;
 
-    if (ly == lyc)
+
+    lcd->ly++;
+
+    if (WindowVisible() && lcd->ly >= lcd->windowY)
+        windowLineCounter++;
+
+    if (lcd->ly == lcd->windowY) windowTriggered = true;
+
+    if (lcd->ly == lcd->lyc)
     {
-        SetStatusBit(LCD_LYC_LY, 1);
+        lcd->SetStatusBit(LCD_LYC_LY, 1);
 
-        if (GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
+        if (lcd->GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
     }
     else
-        SetStatusBit(LCD_LYC_LY, 0);
+        lcd->SetStatusBit(LCD_LYC_LY, 0);
 }
 
 uint8_t LCD::GetColor(uint8_t index, uint8_t pallete)

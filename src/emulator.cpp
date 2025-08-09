@@ -14,72 +14,30 @@ Emulator::Emulator()
 	ppu.ConnectToEmulator(this);
 	lcd.ConnectToEmulator(this);
 
+	Reset();
+
+}
+
+void Emulator::Reset()
+{
+	m_SystemTicks = 0;
+	cpu.Reset();
+	lcd.Reset();
+	ppu.Reset();
+	timer.Reset();
+
 	for (int i = 0; i < memory.size(); i++)
 		memory[i] = 0x00;
 
-	
 	for (int i = 0; i < wram.size(); i++)
 		wram[i] = 0x00;
 
-	
 	for (int i = 0; i < hram.size(); i++)
 		hram[i] = 0x00;
-	
-	// memory[0x100] = 0x78; // LD A, B
-	// memory[0x101] = 0x41; // LD B, C
-	// memory[0x102] = 0x01; // LD BC, imm16
-	// memory[0x103] = 0x05;
-	// memory[0x104] = 0x02;
-	// memory[0x105] = 0x3E; // LD A, imm8
-	// memory[0x106] = 0xCC;
-	// memory[0x107] = 0x02; // LD (BC), A
-
-	// memory[0x100] = 0x08; // LD imm16, SP
-	// memory[0x101] = 0x20;
-	// memory[0x102] = 0x01;
-	// memory[0x103] = 0x3E; // LD A, imm8
-	// memory[0x104] = 0xFF;
-	// memory[0x105] = 0x22; // LD (BC), A
-	// memory[0x106] = 0x56; // LD D, L
-	// memory[0x107] = 0x09; // ADD HL, BC
-
-	// memory[0x100] = 0x03; // INC BC
-	// memory[0x101] = 0x14; // INC D
-	// memory[0x102] = 0x35; // DEC (HL)
-
-	// memory[0x100] = 0x33; 
-	// memory[0x101] = 0x3B; 
-	// memory[0x102] = 0x39; 
-	// memory[0x103] = 0xF9;
-	// memory[0x104] = 0xE8;
-	// memory[0x105] = 0x1; 
-	// memory[0x106] = 0xE8;
-	// memory[0x107] = 0xFF;
-	// memory[0x108] = 0xF8;
-	// memory[0x109] = 0x1;
-	// memory[0x10A] = 0xF8;
-	// memory[0x10B] = 0xFF; 
- 
- 
-	memory[0x100] = 0x8F; // ADC A, A
-	memory[0x101] = 0x88; // ADC A, B
-	memory[0x102] = 0x99; // SBC A, C
-	memory[0x103] = 0x9A; // SBC A, D
-
-	// // Initialize registers and flags
-	// cpu.AF.hi = 0x14;    // A = 0x14
-	// cpu.BC.hi = 0xFF;    // B = 0xFF
-	// cpu.BC.lo = 0x02;    // C = 0x02
-	// cpu.DE.hi = 0x03;    // D = 0x03
-
-	// cpu.SetFlag(FLAG_C, 1); // Set carry flag for ADC/SBC
-
-	// cpu.PC = 0x100;
- 
 
 
 	serial_data[0] = 0;
-	serial_data[1] = 0;	
+	serial_data[1] = 0;
 
 	memory[0xFF05] = 0x00; // TIMA
 	memory[0xFF06] = 0x00; // TMA
@@ -112,26 +70,25 @@ Emulator::Emulator()
 	memory[0xFF4A] = 0x00;
 	memory[0xFF4B] = 0x00;
 	memory[0xFFFF] = 0x00; // IE
-
 }
 
 void Emulator::UpdateFrame()
 {
+	if (!romLoaded) return;
+
 	// system clocks MAX_CYCLES amount of times before drawing the screen.
 	// clock speed = 4.194304MHz; 4194304 clocks a second
 	// if we are doing 60fps 1 frame takes 1/60s that means we need to do 4194304/60 (69905) clocks before we draw the screen
-	for(int i = 0; i < 256; i++)
-	{
-		memory[i] = i;
-	}
 
-	const int MAX_CYCLES = 69905;
+	const static int MAX_CYCLES = 69905;
 
 	static std::string msg;
 
 
 	for (int i = 0; i < MAX_CYCLES; i++)
 	{
+
+
 		clock();
 		static int index = 0;
 		if(read(0xFF02) == 0x81)
@@ -140,7 +97,6 @@ void Emulator::UpdateFrame()
 			msg += c;
 			std::cout << c << std::flush;
 			write(0xFF02, 0);
-			//std::cout << "WRITTEN " << c << " AT PC: " << cpu.PC << std::endl;
 			
 		}
 	}
@@ -160,8 +116,7 @@ void Emulator::clock()
 		
 	}
 	timer.tick(); // maybe pass in cpu to timer tick?
-
-		
+	
 	if (dma.isTransferring())
 		dma.Tick();
 
@@ -172,14 +127,35 @@ void Emulator::clock()
 	m_SystemTicks++;
 }
 
-void Emulator::clock_complete()
+
+void Emulator::SetButtonState(uint8_t data)
 {
-	while (cpu.m_Cycles != 0)
+	buttonState.sel_dpad = data & 0x10;
+	buttonState.sel_button = data & 0x20;
+}
+
+uint8_t Emulator::GetButtonOutput()
+{
+	uint8_t output = 0xCF;
+	// if the bit is ZERO
+
+	if (!buttonState.sel_button) 
 	{
-		cpu.Clock();
+		if (buttonState.select) output = ~(1 << 2);
+		if (buttonState.start) output = ~(1 << 3);
+		if (buttonState.b) output = ~(1 << 1);
+		if (buttonState.a) output = ~(1 << 0);
 	}
 
+	if (!buttonState.sel_dpad)
+	{
+		if (buttonState.up) output = ~(1 << 2);
+		if (buttonState.down) output = ~(1 << 3);
+		if (buttonState.left) output = ~(1 << 1);
+		if (buttonState.right) output = ~(1 << 0);
+	}
 
+	return output;
 }
 
 uint8_t Emulator::read(uint16_t address)
@@ -193,6 +169,7 @@ uint8_t Emulator::read(uint16_t address)
 		return ppu.VRAM_read(address);
     } else if (address < 0xC000) {
         //Cartridge RAM
+		return 0xFF;
         return cartridge->ReadCart(address);
     } else if (address < 0xE000) {
         //WRAM (Working RAM)
@@ -210,6 +187,10 @@ uint8_t Emulator::read(uint16_t address)
     } else if (address < 0xFF80) {
         //IO Registers...
         //TODO
+
+		if (address == 0xFF00)
+			return GetButtonOutput();
+
 		if (address == 0xFF01) {
         	return serial_data[0];
    		 }
@@ -268,17 +249,16 @@ void Emulator::write(uint16_t address, uint8_t data)
         //unusable reserved
     } else if (address < 0xFF80) {
         //IO Registers...
-        //TODO
-		if (address == 0xFF01)  serial_data[0] = data;
+		if (address == 0xFF00)
+			SetButtonState(data);
+		else if (address == 0xFF01)  serial_data[0] = data;
 		else if (address == 0xFF02) serial_data[1] = data;
 		else if (address >= 0xFF04 && address <= 0xFF07) timer.write(address, data);
 		else if (address == 0xFF0F) cpu.int_flag = data;
 		else if (address >= 0xFF40 && address <= 0xFF4B) lcd.write(address, data);
 
         
-    } else if (address == 0xFFFF) {
-        //CPU SET ENABLE REGISTER
-        
+    } else if (address == 0xFFFF) {        
         cpu.int_enable = data;
     } else {
         hram[address - 0xFF80] = data;
@@ -308,4 +288,5 @@ void Emulator::write16(uint16_t address, uint16_t data)
 void Emulator::LoadROM(const std::string& filepath)
 {
 	cartridge = std::make_unique<Cartridge>(filepath);
+	romLoaded = true;
 }

@@ -9,31 +9,36 @@ Cartridge::Cartridge(const std::string& filename)
 
 	if(!ifs.good()) std::cout << "ROM NOT FOUND PROPERLY" << std::endl;
 
-	ifs.seekg(0x148); // offset where rom byte is
-	uint8_t rom_byte = 0;
-	ifs.read((char*)&rom_byte, 1);
+	// 0x4F, is the size of the header
+	ifs.seekg(0x100);
+	ifs.read((char*)&header, 0x4F);
 	
-	std::cout << rom_byte << std::endl;
-	
-	m_ROM_size = 32768 * (1 << rom_byte);
+	m_ROM_size = 32768 * (1 << header.romSize);
 	
 	m_CartData = (uint8_t*)malloc(m_ROM_size);
 
 	ifs.seekg(0);
 	ifs.read((char*)m_CartData, m_ROM_size);
 
+	//char romByte = 0;
+	//ifs.seekg(0x147);
+	//ifs.read(&romByte, 1);
+	//std::cout << (int)romByte << std::endl;
+
 	ifs.close();
+
+
+	memoryBankController = CreateMBCByType(header, m_CartData);
 
 	std::cout << "ROM SIZE: " << (int)m_ROM_size << std::endl;
 }
 
 uint8_t Cartridge::ReadCart(uint16_t address)
 {
-	return m_CartData[address];
+	return memoryBankController->read(address);
 }
 
 void Cartridge::WriteCart(uint16_t address, uint8_t data)
 {
-
-	m_CartData[address] = data;
+	memoryBankController->write(address, data);
 }

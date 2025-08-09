@@ -48,7 +48,7 @@ add_library(imgui STATIC
 FetchContent_Declare(
     rlImGui
     GIT_REPOSITORY https://github.com/raylib-extras/rlImGui.git
-    GIT_TAG main
+    GIT_TAG 0105acf1bfba22e883688e5b9ffb1af0536739e2
 )
 
 FetchContent_MakeAvailable(rlImGui)
@@ -70,6 +70,12 @@ file(GLOB INCLUDE_FILES "include/*.h")
 add_library(GameBoyLib ${SOURCE_FILES} ${INCLUDE_FILES})
 target_include_directories(GameBoyLib PUBLIC "include/" ${raylib_SOURCE_DIR}/src ${rlimgui_SOURCE_DIR})
 target_link_libraries(GameBoyLib glfw raylib rlImGui imgui)
+
+target_compile_definitions(GameBoyLib
+    PRIVATE
+        # If the debug configuration pass the DEBUG define to the compiler 
+        $<$<CONFIG:Debug>:DEBUG>
+)
 
 add_executable(GameBoyTests "tests/main.cpp")
 target_link_libraries(GameBoyTests GameBoyLib gtest_main)

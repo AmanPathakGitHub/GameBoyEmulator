@@ -12,6 +12,15 @@ void Timer::ConnectTimerToCPU(CPU* cpu)
 
 }
 
+void Timer::Reset()
+{
+    div = 0xABCC;
+    tima = 0;
+    tac = 0;
+    tma = 0;
+
+}
+
 
 void Timer::tick()
 {

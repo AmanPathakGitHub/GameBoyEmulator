@@ -11,6 +11,8 @@
 #include "timer.h"
 #include "ppu.h"
 
+  
+
 class Emulator
 {
 public:
@@ -19,16 +21,34 @@ public:
 	void UpdateFrame(); // this updates all emulator things, including the buffer of pixels
 	void clock();
 	
-	uint8_t read(uint16_t address);
-    void clock_complete();
-    void write(uint16_t address, uint8_t data);
-    //void write(uint16_t address, uint16_t data);
+	struct ButtonState
+	{
+		bool a = false;
+		bool b = false;
+		bool select = false;
+		bool start = false;
+		bool right = false;
+		bool left = false;
+		bool up = false;
+		bool down = false;
 
+		bool sel_dpad = false;
+		bool sel_button = false;
+	};
+
+	ButtonState buttonState;
+	void SetButtonState(uint8_t data);
+	uint8_t GetButtonOutput();
+	
+	uint8_t read(uint16_t address);
+    void write(uint16_t address, uint8_t data);
 
 	uint16_t read16(uint16_t address);
 	void write16(uint16_t address, uint16_t data);
 
 	void LoadROM(const std::string& filepath);
+
+	void Reset();
 
 	CPU cpu; // public just to draw stuff
 	Timer timer;
@@ -42,9 +62,14 @@ public:
 	std::array<uint8_t, 0x80> hram;
 
 	uint64_t m_SystemTicks = 0;
+
+	bool romLoaded = false;
+
 private:
 	std::unique_ptr<Cartridge> cartridge;
 
+
 	uint8_t serial_data[2];
+	uint8_t joypadState = 0x30;
 
 };

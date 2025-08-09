@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <queue>
-#include <raylib.h>
 #include <array>
 #include "cpu.h"
 
@@ -69,10 +68,15 @@ struct LCD
 
     uint8_t read(uint16_t address);
     void write(uint16_t address, uint8_t data);
+    
     void ConnectToEmulator(Emulator* emu);
+    
+    void Reset();
+
     inline bool GetStatusBit(uint8_t statusType) { return !!(status & statusType); }
     void SetStatusBit(uint8_t statusType, uint8_t set);
     inline bool GetControlBit(uint8_t controlType) const { return !!(lcdc & controlType); }
+
 
     Emulator* emu;
 
@@ -90,7 +94,6 @@ struct LCD
     uint8_t obp0;
     uint8_t obp1;
 
-    void IncrementLY();
     uint8_t GetColor(uint8_t index, uint8_t pallete);
 
 };  
@@ -119,6 +122,7 @@ public:
     uint8_t VRAM_read(uint16_t address);
     
     void tick();
+    void Reset();
 
     void ConnectCPU(CPU* cpu);
     void ConnectLCD(LCD* lcd);
@@ -133,11 +137,13 @@ public:
     
     uint8_t videoBuffer[RESX * RESY];
 
+    uint8_t windowLineCounter = 0;
+
 
 private:
 
     CPU* cpu;
-    LCD* lcd;
+    LCD* lcd = nullptr;
     Emulator* emu;
     
     OAMEntry oam_ram[40];
@@ -145,6 +151,8 @@ private:
 
     Mode mode = OAMSCAN;
     void SwitchMode(Mode mode);
+
+    void IncrementLY();
 
 
     uint16_t dots = 0;
@@ -169,9 +177,8 @@ private:
     uint8_t tileLo;
     uint8_t tileHi;
 
+    bool windowTriggered = false;
 
-    uint8_t mapX = 0;
-    uint8_t mapY = 0;
 
     enum FetchState {
         GetTile,
@@ -186,5 +193,8 @@ private:
     void FetchSpritePixels();
     void FetchBackGroundPixels();
     void PixelRender();
+
+    bool WindowVisible();
+    void FetchWindowPixels();
 };
 
