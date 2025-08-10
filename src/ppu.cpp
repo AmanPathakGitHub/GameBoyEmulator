@@ -2,7 +2,7 @@
 
 #include "emulator.h"
 #include <iostream>
-
+#include <cstring>
 #include <algorithm>
 
 PPU::PPU()
@@ -265,12 +265,12 @@ bool PPU::WindowVisible()
 
 void PPU::FetchWindowPixels()
 {
-    if (lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
+    if (!windowTriggered || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
         return;
     
     uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
 
-    uint16_t fetcherX = (fetchedX - (lcd->windowX - 7) / 8) & 0x1F;
+    uint16_t fetcherX = (fetchedX - (lcd->windowX) / 8) & 0x1F;
 
     tileIndexAddress += 32 * (windowLineCounter / 8) + fetcherX;
     uint8_t tileIndex = emu->read(tileIndexAddress);
@@ -300,9 +300,6 @@ void PPU::FetchBackGroundPixels()
 
             if (WindowVisible())
                 FetchWindowPixels();
-
-            
-            
         }
 
 
@@ -350,7 +347,7 @@ void PPU::FetchBackGroundPixels()
                 if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
                     col = 0;
                 
-                if(x >= 0)
+                //if(x >= 0)
                     background_pixels.push(lcd->GetColor(col, lcd->bgp));
 
 
@@ -382,9 +379,7 @@ void PPU::PixelRender()
         uint8_t pallete = spritePixel.pallete ? lcd->obp1 : lcd->obp0;
         color = lcd->GetColor(spritePixel.color, pallete);
     }
-            
-    
-    
+  
     int index = lcd->ly * RESX + pushedX;
     
     if (scanlineX >= lcd->scrollX % 8)
@@ -544,11 +539,9 @@ void LCD::SetStatusBit(uint8_t statusType, uint8_t set)
 
 void PPU::IncrementLY()
 {
-
-
     lcd->ly++;
-
-    if (WindowVisible() && lcd->ly >= lcd->windowY)
+ 
+    if (WindowVisible() && lcd->ly > lcd->windowY)
         windowLineCounter++;
 
     if (lcd->ly == lcd->windowY) windowTriggered = true;

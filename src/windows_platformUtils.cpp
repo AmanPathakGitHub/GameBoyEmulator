@@ -1,4 +1,3 @@
-#pragma once
 
 // This file is to seperate platorm specific code (so far only the dialog box)
 // also raylib and the win32 api (windows.h and raylib.h) have naming conflicts so they can't be included in the same file

@@ -3,7 +3,7 @@
 
 #include <cassert>
 #include <stdexcept>
-
+#include <cstring>
 #include <iostream>
 
 MBC::MBC(uint8_t* cartData)
@@ -68,10 +68,8 @@ uint8_t MBC1::read(uint16_t address)
 	
 	if ((address & 0xE000) == 0xA000)
 	{
-		if (!ramEnabled)
-			return 0xFF;
+		if (!ramEnabled) return 0xFF;
 
-		//assert((address - 0xA000) * ramBankNumber * 0x2000 < externalRAM.size());
 		uint8_t ramBank = bankingMode == 0 ? 0 : ramBankNumber;
 		int effectiveAddress = (address - 0xA000) + ramBank * 0x2000;
 
@@ -105,14 +103,16 @@ void MBC1::write(uint16_t address, uint8_t data)
 	if ((address & 0xE000) == 0x6000)
 	{
 		bankingMode = data & 0b1;
-
 	}
 
 	if ((address & 0xE000) == 0xA000)
 	{
 		if (ramEnabled)
 		{
-			externalRAM[address - 0xA000] = data;
+			uint8_t ramBank = bankingMode == 0 ? 0 : ramBankNumber;
+			int effectiveAddress = (address - 0xA000) + ramBank * 0x2000;
+
+			externalRAM[effectiveAddress] = data;
 		}
 	}
 }

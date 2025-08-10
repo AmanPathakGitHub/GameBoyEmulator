@@ -169,7 +169,6 @@ uint8_t Emulator::read(uint16_t address)
 		return ppu.VRAM_read(address);
     } else if (address < 0xC000) {
         //Cartridge RAM
-		return 0xFF;
         return cartridge->ReadCart(address);
     } else if (address < 0xE000) {
         //WRAM (Working RAM)
