@@ -6,6 +6,8 @@
 #include <cstring>
 #include <iostream>
 
+#include <fstream>
+
 MBC::MBC(uint8_t* cartData)
 {
 	this->cartData = cartData;
@@ -45,12 +47,19 @@ MBC1::MBC1(uint8_t* cartData, const CartridgeHeader& header)
 	else if (header.ramSize == 3) ramSize = 32 * 1024;
 
 	externalRAM = new uint8_t[ramSize];
-	memset(externalRAM, 0, ramSize);
+	externalRAMSize = ramSize;
 
-	//if(ramSize != 0) externalRAM.reserve(ramSize);
+	title = header.title;
 
-	//for (int i = 0; i < ramSize; i++)
-	//	externalRAM.emplace_back(0);
+	std::fstream fs(title + ".sav");
+
+	if (fs.is_open())
+	{
+		fs.read((char*)externalRAM, ramSize);
+	}
+	else 
+		memset(externalRAM, 0, ramSize);
+
 
 	cartDataSize = 32768 * (1 << header.romSize);
 	
@@ -58,6 +67,7 @@ MBC1::MBC1(uint8_t* cartData, const CartridgeHeader& header)
 
 MBC1::~MBC1()
 {
+	save();
 	delete[] externalRAM;
 }
 
@@ -88,24 +98,24 @@ void MBC1::write(uint16_t address, uint8_t data)
 	if (address < 0x2000)
 		ramEnabled = data == 0xA;
 	
-	if ((address & 0xE000) == 0x2000)
+	else if (address < 0x4000)
 	{
 		if (data == 0) data = 1;
 		data &= 0b11111;
 		romBankNumber = data;
 	}
 
-	if ((address & 0xE000) == 0x4000)
+	else if ((address & 0xE000) == 0x4000)
 	{
 		ramBankNumber = data & 0b11;
 	}
 
-	if ((address & 0xE000) == 0x6000)
+	else if ((address & 0xE000) == 0x6000)
 	{
 		bankingMode = data & 0b1;
 	}
 
-	if ((address & 0xE000) == 0xA000)
+	else if ((address & 0xE000) == 0xA000)
 	{
 		if (ramEnabled)
 		{
@@ -115,6 +125,19 @@ void MBC1::write(uint16_t address, uint8_t data)
 			externalRAM[effectiveAddress] = data;
 		}
 	}
+}
+
+void MBC1::save()
+{
+	std::ofstream fs(title + ".sav", std::ios::binary);
+
+	if (!fs.is_open()) __debugbreak();
+
+	std::cout << externalRAMSize << std::endl;
+
+	fs.write((char*)externalRAM, externalRAMSize);
+
+	fs.close();
 }
 
 

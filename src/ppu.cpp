@@ -65,6 +65,8 @@ void PPU::tick()
     
     }
 
+
+
     dots++;
 
 }
@@ -192,6 +194,12 @@ void PPU::HandleModeDrawPixels()
 
     if (pushedX >= RESX)
     {
+        if (lcd->ly == lcd->lyc)
+        {
+            lcd->SetStatusBit(LCD_LYC_LY, 1);
+
+            if (lcd->GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
+        }
         SwitchMode(HBLANK);
 
         while (!background_pixels.empty())
@@ -260,19 +268,19 @@ bool PPU::WindowVisible()
     uint8_t wx = lcd->windowX;
     uint8_t wy = lcd->windowY;
 
-    return lcd->GetControlBit(LCDC_WINDOW_ENABLE) && wx >= 0 && wx - 7 < RESX && wy >= 0 && wy < RESY;
+    return lcd->GetControlBit(LCDC_WINDOW_ENABLE) && wx >= 0 && wx < RESX && wy >= 0 && wy < RESY;
 }
 
 void PPU::FetchWindowPixels()
 {
-    if (!windowTriggered || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
+    if (lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
         return;
     
     uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
 
-    uint16_t fetcherX = (fetchedX - (lcd->windowX) / 8) & 0x1F;
-
-    tileIndexAddress += 32 * (windowLineCounter / 8) + fetcherX;
+    uint16_t fetcherX = ((fetchedX) - (lcd->windowX - 7) / 8) & 0x1F;
+    uint16_t fetcherY = ((lcd->ly - lcd->windowY)) & 255;
+    tileIndexAddress += 32 * (fetcherY / 8) + fetcherX;
     uint8_t tileIndex = emu->read(tileIndexAddress);
 
     tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
@@ -541,10 +549,8 @@ void PPU::IncrementLY()
 {
     lcd->ly++;
  
-    if (WindowVisible() && lcd->ly > lcd->windowY)
+    if (WindowVisible() && lcd->ly >= lcd->windowY)
         windowLineCounter++;
-
-    if (lcd->ly == lcd->windowY) windowTriggered = true;
 
     if (lcd->ly == lcd->lyc)
     {
