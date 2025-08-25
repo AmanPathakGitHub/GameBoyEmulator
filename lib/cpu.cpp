@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "emulator.h"
-#include "application.h"
 #include <sstream>
 #include <format>
 
@@ -32,6 +31,43 @@ void CPU::ConnectCPUToBus(Emulator* emu)
 	this->emu = emu;
 }
 
+
+std::string_view RegTypeToString(const CPU::RegType& reg)
+{
+	switch (reg)
+	{
+	case CPU::RegType::NONE: return "NONE";
+	case CPU::RegType::A:    return "A";
+	case CPU::RegType::B:    return "B";
+	case CPU::RegType::C:    return "C";
+	case CPU::RegType::D:    return "D";
+	case CPU::RegType::E:    return "E";
+	case CPU::RegType::H:    return "H";
+	case CPU::RegType::L:    return "L";
+	case CPU::RegType::AF:   return "AF";
+	case CPU::RegType::BC:   return "BC";
+	case CPU::RegType::DE:   return "DE";
+	case CPU::RegType::HL:   return "HL";
+	case CPU::RegType::SP:   return "SP";
+	case CPU::RegType::HLI:  return "HLI";
+	case CPU::RegType::HLD:  return "HLD";
+	default: return "UNKNOWN";
+	}
+}
+
+std::string_view CondTypeToString(const CPU::CondType& cond)
+{
+	switch (cond)
+	{
+	case CPU::CondType::NONE: return "NONE";
+	case CPU::CondType::Z:    return "Z";
+	case CPU::CondType::NZ:   return "NZ";
+	case CPU::CondType::C:    return "C";
+	case CPU::CondType::NC:   return "NC";
+	default: return "UNKNOWN";
+	}
+}
+
 void WriteOp(CPU::Operand& op, std::stringstream& ss)
 {
 		switch(op.mode)
@@ -45,10 +81,10 @@ void WriteOp(CPU::Operand& op, std::stringstream& ss)
 			
 			case CPU::AddressingMode::REG16:
 			case CPU::AddressingMode::REG8:
-				ss << " " << Application::RegTypeToString(op.reg);
+				ss << " " << RegTypeToString(op.reg);
 				break;
 			case CPU::AddressingMode::IND:
-				ss << " (" << Application::RegTypeToString(op.reg) << ")";
+				ss << " (" << RegTypeToString(op.reg) << ")";
 				break;
 			case CPU::AddressingMode::IND_IMM8:
 				ss << " (imm8)";
@@ -57,10 +93,11 @@ void WriteOp(CPU::Operand& op, std::stringstream& ss)
 				ss << " (imm16)";
 				break;
 			case CPU::AddressingMode::COND:
-				ss << " " << Application::CondTypeToString(op.cond);
+				ss << " " << CondTypeToString(op.cond);
 
 		}
 }
+
 
 std::string dissassembleInstr(CPU::Instruction ins, int opcode )
 {

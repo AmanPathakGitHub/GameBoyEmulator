@@ -1,5 +1,4 @@
 #include "emulator.h"
-#include "application.h"
 #include <iostream>
 
 Emulator::Emulator()

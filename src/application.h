@@ -23,9 +23,7 @@ public:
 
 	void Run();
 
-	static std::vector<std::string> dissassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress);
-	static std::string RegTypeToString(CPU::RegType reg);
-	static std::string CondTypeToString(CPU::CondType cond);
+	static std::vector<std::string> disassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress);
 
 	bool emu_run = false;
 

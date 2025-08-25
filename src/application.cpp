@@ -323,7 +323,7 @@ void Application::ShowDisassemblyText()
 {
 	if (!emu.romLoaded) return;
 
-	std::vector<std::string> dissassemblylines = dissassemble(emu, emu.cpu.PC - 10, emu.cpu.PC + 15);
+	std::vector<std::string> dissassemblylines = disassemble(emu, emu.cpu.PC - 10, emu.cpu.PC + 15);
 
 	for (std::string l : dissassemblylines)
 		ImGui::Text(l.c_str());
@@ -341,7 +341,7 @@ void Application::ShowTileIndexMap()
 
 }
 
-std::vector<std::string> Application::dissassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress)
+std::vector<std::string> Application::disassemble(Emulator& emu, uint16_t startAddress, uint16_t endAddress)
 {
 	std::vector<std::string> output;
 	for(uint16_t currentAddress = startAddress; currentAddress <= endAddress;)
@@ -399,41 +399,6 @@ void Application::WriteParams(Emulator& emu, CPU::Operand& op, std::stringstream
 		}
 }
 
-std::string Application::RegTypeToString(CPU::RegType reg)
-{
-	switch (reg)
-	{
-		case CPU::RegType::NONE: return "NONE";
-        case CPU::RegType::A:    return "A";
-        case CPU::RegType::B:    return "B";
-        case CPU::RegType::C:    return "C";
-        case CPU::RegType::D:    return "D";
-        case CPU::RegType::E:    return "E";
-        case CPU::RegType::H:    return "H";
-        case CPU::RegType::L:    return "L";
-        case CPU::RegType::AF:   return "AF";
-        case CPU::RegType::BC:   return "BC";
-        case CPU::RegType::DE:   return "DE";
-        case CPU::RegType::HL:   return "HL";
-        case CPU::RegType::SP:   return "SP";
-        case CPU::RegType::HLI:  return "HLI";
-        case CPU::RegType::HLD:  return "HLD";
-        default: return "UNKNOWN";
-	}
-}
-
-std::string Application::CondTypeToString(CPU::CondType cond)
-{
-	switch (cond)
-    {
-        case CPU::CondType::NONE: return "NONE";
-        case CPU::CondType::Z:    return "Z";
-        case CPU::CondType::NZ:   return "NZ";
-        case CPU::CondType::C:    return "C";
-        case CPU::CondType::NC:   return "NC";
-        default: return "UNKNOWN";
-    }
-}
 
 
 void Application::Run()

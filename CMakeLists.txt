@@ -63,13 +63,12 @@ target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/
 target_link_libraries(imgui)
 
 
-file(GLOB SOURCE_FILES "src/*.cpp")
-list(FILTER SOURCE_FILES EXCLUDE REGEX ".*main\\.cpp$")
+file(GLOB LIB_SOURCE_FILES "lib/*.cpp")
 file(GLOB INCLUDE_FILES "include/*.h")
 
-add_library(GameBoyLib ${SOURCE_FILES} ${INCLUDE_FILES})
-target_include_directories(GameBoyLib PUBLIC "include/" ${raylib_SOURCE_DIR}/src ${rlimgui_SOURCE_DIR})
-target_link_libraries(GameBoyLib glfw raylib rlImGui imgui)
+add_library(GameBoyLib ${LIB_SOURCE_FILES} ${INCLUDE_FILES})
+target_include_directories(GameBoyLib PUBLIC "include/" "lib/")
+target_link_libraries(GameBoyLib)
 
 target_compile_definitions(GameBoyLib
     PRIVATE
@@ -82,5 +81,8 @@ target_link_libraries(GameBoyTests GameBoyLib gtest_main)
 
 add_test(NAME CPU_TESTS COMMAND GameBoyTests)
 
-add_executable(GameBoyEmulator "src/main.cpp")
-target_link_libraries(GameBoyEmulator GameBoyLib)
+file(GLOB_RECURSE APPLICATION_SOURCE_FILES "src/*.cpp")
+file(GLOB_RECURSE APPLICATION_INCLUDE_FILES "src/*.h")
+add_executable(GameBoyEmulator ${APPLICATION_SOURCE_FILES} ${APPLICATION_INCLUDE_FILES})
+target_include_directories(GameBoyEmulator PUBLIC "include/" "src/" ${raylib_SOURCE_DIR}/src ${rlimgui_SOURCE_DIR})
+target_link_libraries(GameBoyEmulator GameBoyLib glfw raylib rlImGui imgui)
