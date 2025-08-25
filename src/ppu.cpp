@@ -8,7 +8,7 @@
 PPU::PPU()
 {
     memset(vram, 0, 0x2000);
-    memset(videoBuffer, 0, RESX * RESY);
+    memset(videoBuffer, 3, RESX * RESY * 4);
     memset(oam_ram, 0, sizeof(OAMEntry) * 40);
 
     background_pixels = {};
@@ -114,7 +114,7 @@ void PPU::HandleModeOAMScan()
 
         std::sort(sprite_buffer.begin(), sprite_buffer.end(), [](const Sprite& sprite1, const Sprite& sprite2)
             {
-                return sprite1.spriteData.x > sprite2.spriteData.x;
+                return sprite1.spriteData.x < sprite2.spriteData.x;
             });
         
     }
@@ -182,13 +182,16 @@ void PPU::HandleModeVBLANK()
 void PPU::HandleModeDrawPixels()
 {
 
-    if (dots % 2 == 0)
+    if (dots % 10 == 0)
     {
         FetchBackGroundPixels();
-        FetchSpritePixels();
 
 
     }
+
+    FetchSpritePixels();
+
+
 
     PixelRender();
 
@@ -279,7 +282,7 @@ void PPU::FetchWindowPixels()
     uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
 
     uint16_t fetcherX = ((fetchedX) - (lcd->windowX - 7) / 8) & 0x1F;
-    uint16_t fetcherY = ((lcd->ly - lcd->windowY)) & 255;
+    uint16_t fetcherY = (lcd->ly - lcd->windowY);
     tileIndexAddress += 32 * (fetcherY / 8) + fetcherX;
     uint8_t tileIndex = emu->read(tileIndexAddress);
 
@@ -289,84 +292,52 @@ void PPU::FetchWindowPixels()
 
 void PPU::FetchBackGroundPixels()
 {
-    switch (fetch_state)
+
+    if (lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
     {
-    case GetTile:
+        // wrap in function
+        uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
+
+        uint16_t fetcherX = (lcd->scrollX / 8 + fetchedX) & 0x1F;
+        uint16_t fetcherY = (lcd->scrollY + lcd->ly) & 255;
+
+        tileIndexAddress += fetcherY / 8 * 32 + fetcherX;
+        uint8_t tileIndex = emu->read(tileIndexAddress);
+        tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+
+        if (WindowVisible())
+            FetchWindowPixels();
+
+
+    }
+
+    fetchedX++;
+
+    uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
+    tileLo = emu->read(tileAddress + tileY);
+    tileHi = emu->read(tileAddress + tileY + 1);
+
+
+
+    if (background_pixels.size() < 8)
     {
 
-        if (lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+        for (int i = 7; i >= 0; i--)
         {
-            // wrap in function
-            uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
+            uint8_t hi = !!(tileHi & (1 << i));
+            uint8_t lo = !!(tileLo & (1 << i));
 
-            uint16_t fetcherX = (lcd->scrollX / 8 + fetchedX) & 0x1F;
-            uint16_t fetcherY = (lcd->scrollY + lcd->ly) & 255;
+            uint8_t col = (hi << 1) | lo;
 
-            tileIndexAddress += fetcherY / 8 * 32 + fetcherX;
-            uint8_t tileIndex = emu->read(tileIndexAddress);
-            tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+            if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+                col = 0;
 
-            if (WindowVisible())
-                FetchWindowPixels();
+            background_pixels.emplace(lcd->GetColor(col, lcd->bgp));
+
+
         }
-
-
-
-        fetchedX++;
-        fetch_state = DataLow;
-       
-    }
-        break;
-    case DataLow:
-
-    {
-        uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
-        tileLo = emu->read(tileAddress + tileY);
-        fetch_state = DataHigh;
     }
 
-        
-        break;
-    case DataHigh:
-    {
-        uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
-        tileHi = emu->read(tileAddress + 1 + tileY);
-
-        fetch_state = Sleep;
-    }
-
-        break;
-    case Sleep:
-        fetch_state = Push;
-        break;
-    case Push:
-    {
-        if (background_pixels.size() < 8)
-        {
-            int x = fetchedX * 8 - (8 - (lcd->scrollX % 8));
-
-            for (int i = 7; i >= 0; i--)
-            {
-                uint8_t hi = !!(tileHi & (1 << i));
-                uint8_t lo = !!(tileLo & (1 << i));
-
-                uint8_t col = (hi << 1) | lo;
-
-                if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
-                    col = 0;
-                
-                //if(x >= 0)
-                    background_pixels.push(lcd->GetColor(col, lcd->bgp));
-
-
-            }
-
-            fetch_state = GetTile;
-        }
-
-    }
-        break;    
-    }
 
 }
 
@@ -389,12 +360,32 @@ void PPU::PixelRender()
     }
   
     int index = lcd->ly * RESX + pushedX;
-    
-    if (scanlineX >= lcd->scrollX % 8)
+
+    if (WindowVisible() && !(lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14))
     {
-        videoBuffer[index] = color;
-        pushedX++;
+        if (scanlineX >= lcd->windowX % 8 || lcd->ly >= lcd->windowY % 8) // this needs to check window x and window y for smooth window scrolling
+        {
+
+            uint32_t defaultColors[4] = { 0xFFFFFFFF, 0xA9A9A9FF, 0x545454FF, 0x00000000 };
+
+            videoBuffer[index] = defaultColors[color];
+            pushedX++;
+        }
+
     }
+    else
+    {
+        if (scanlineX >= lcd->scrollX % 8) // this needs to check window x and window y for smooth window scrolling
+        {
+
+            uint32_t defaultColors[4] = { 0xFFFFFFFF, 0xA9A9A9FF, 0x545454FF, 0x00000000 };
+
+            videoBuffer[index] = defaultColors[color];
+            pushedX++;
+        }
+
+    }
+    
     
     scanlineX++;
 
@@ -446,11 +437,9 @@ void DMA::Tick()
 {
     uint8_t data = emu->read(currentAddress);
     uint16_t destinationAddress = 0xFE00 | (currentAddress & 0xFF);
-    //emu->write(destinationAddress, data);
 
     emu->ppu.OAM_write(destinationAddress, data);
 
-    //transferring = (currentAddress & 0xFF) < 0x9F;
     transferring = destinationAddress < 0xFE9F;
     currentAddress++;
 }
@@ -541,15 +530,15 @@ void LCD::SetStatusBit(uint8_t statusType, uint8_t set)
         return;
     }
         
-    if (set) status | statusType;
-    else status & ~(statusType);
+    if (set) status |= statusType;
+    else status &= ~(statusType);
 }
 
 void PPU::IncrementLY()
 {
     lcd->ly++;
  
-    if (WindowVisible() && lcd->ly >= lcd->windowY)
+    if (WindowVisible() && lcd->ly > lcd->windowY)
         windowLineCounter++;
 
     if (lcd->ly == lcd->lyc)

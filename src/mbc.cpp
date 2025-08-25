@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <iostream>
+#include <expected>
 
 #include <fstream>
 
@@ -150,7 +151,7 @@ std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* car
 	case 1: return std::make_unique<MBC1>(cartData, header);
 	case 2: return std::make_unique<MBC1>(cartData, header);
 	case 3: return std::make_unique<MBC1>(cartData, header);
-	default: throw std::runtime_error("CARTRIDGE TYPE NOT SUPPORTED"); // NOT SUPPORTED
+	default: throw std::runtime_error("ROM TYPE NOT SUPPORTED");
 	}
 }
 

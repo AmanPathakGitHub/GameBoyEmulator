@@ -26,6 +26,8 @@ struct Sprite // USELESS NOW
 {
     OAMEntry spriteData;
     uint8_t spriteHeight = 8;
+
+
 };
 
 class Emulator;
@@ -134,8 +136,8 @@ public:
         OAMSCAN,
         DRAWPIXELS
     };
-    
-    uint8_t videoBuffer[RESX * RESY];
+
+    uint32_t videoBuffer[RESX * RESY];
 
     uint8_t windowLineCounter = 0;
 

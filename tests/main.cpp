@@ -3,8 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "cpu.h"
-#include "Emulator.h" // Assuming Emulator is your bus/memory system
+#include "emulator.h" // Assuming Emulator is your bus/memory system
 
 
 class CPUTest : public ::testing::Test {

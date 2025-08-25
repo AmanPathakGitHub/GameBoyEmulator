@@ -7,12 +7,24 @@
 #include <sstream>
 #include <format>
 
-#define assert(x) if(x) std::cout << "Asserted!" << std::endl;
-
 CPU::CPU()
 {
 	debug_file.open("log2.txt");
+	
+	for(int opcode = 0; opcode <= 0xFF; opcode++)
+	{
+		if (opcode == 0xCB) continue;
+		m_JumpTable[opcode] = InstructionByOpcode(opcode);
+	}
+
+	for (int opcode = 0; opcode <= 0xFF; opcode++)
+	{
+		m_CBPrefixJumpTable[opcode] = HandleCBInstruction(opcode);
+	}
+
+
 	Reset();
+
 }
 
 void CPU::ConnectCPUToBus(Emulator* emu)
@@ -86,21 +98,6 @@ void CPU::Reset()
 
 	m_Cycles = 0;
 
-	// boot rom would be loaded into memory here
-	// but apparently thats illegal to have so we just skip it
-
-
-	// for(int hi = 0; hi <= 0xF; hi++)
-	// {
-	// 	for(int lo = 0; lo <= 0xF; lo++)
-	// 	{
-			
-	// 		int opcode = (hi << 4) | lo;
-	// 		if(opcode == 0xCB) continue;
-	// 		std::cout << dissassembleInstr(InstructionByOpcode(opcode), opcode);
-	// 	}
-	// 	std::cout << std::endl;
-	// }
 }
 
 
@@ -147,19 +144,23 @@ void CPU::Clock()
 			  << "\n";
 			*/
 			
-			m_CurrentInstruction = InstructionByOpcode(opcode);
-			if(opcode == 0xCB) PC++; // temporary
 
-
-			// if(m_CurrentInstruction.name == "XXX")
-			// 	std::cout << "UNHANDLED OPCODE " << (int)opcode << std::endl;
+			if (opcode == 0xCB)
+			{
+				uint8_t cbOpcode = emu->read(PC++);
+				m_CurrentInstruction = m_CBPrefixJumpTable[cbOpcode];
+			}
+			else
+				m_CurrentInstruction = m_JumpTable[opcode];
+			
+			
 
 			
 			m_Cycles = m_CurrentInstruction.cycles;
 
 			// might change to std::function
 			(this->*m_CurrentInstruction.execute)();
-			;
+			
 		}
 
 		m_Cycles--;
@@ -167,12 +168,6 @@ void CPU::Clock()
 		
 	}
 
-	// static int lastVal = 0;
-	// if(emu->read(0xFF80) != lastVal)
-	// {
-	// 	std::cout << (int)emu->read(0xFF80) << std::endl;
-	// 	lastVal = emu->read(0xFF80);
-	// }
 }
 
 
@@ -849,75 +844,6 @@ void CPU::DAA()
 	
 }
 
-// void CPU::DAA()
-// {
-
-// 	if(!GetFlag(FLAG_N))
-// 	{
-// 		if(GetFlag(FLAG_C) || AF.hi > 0x99) {AF.hi += 0x60; SetFlag(FLAG_C, 1);}
-// 		if(GetFlag(FLAG_H) || (AF.hi & 0x0f) > 0x09) { AF.hi += 0x06;} 	
-// 	} 
-// 	else
-// 	{
-// 		if(GetFlag(FLAG_C)) {AF.hi -= 0x60;}
-// 		if(GetFlag(FLAG_H)) {AF.hi -= 0x06;}
-// 	}
-
-	
-// 	SetFlag(FLAG_Z, AF.hi == 0);
-// 	SetFlag(FLAG_H, 0);
-// }
-
-// void CPU::DAA() {
-//     uint8_t a = AF.hi;
-//     uint8_t adjust = 0;
-//     bool carry = GetFlag(FLAG_C);
-
-//     if (!GetFlag(FLAG_N)) { // After an ADD
-//         if (GetFlag(FLAG_H) || (a & 0x0F) > 9)
-//             adjust |= 0x06;
-//         if (GetFlag(FLAG_C) || a > 0x99) {
-//             adjust |= 0x60;
-//             carry = true; // Set carry in ADD mode only
-//         }
-//         a += adjust;
-//     } else { // After a SUB
-//         if (GetFlag(FLAG_H)) adjust |= 0x06;
-//         if (GetFlag(FLAG_C)) adjust |= 0x60;
-//         a -= adjust;
-//     }
-
-//     AF.hi = a;
-
-//     SetFlag(FLAG_Z, a == 0);
-//     SetFlag(FLAG_H, false);
-//     SetFlag(FLAG_C, carry); // Do not clear carry in SUB if it was already set
-// }
-
-// void CPU::DAA() {
-// 	uint8_t correction = 0;
-// 	bool carry = GetFlag(FLAG_C);
-
-// 	if (!GetFlag(FLAG_N)) {
-// 		if (GetFlag(FLAG_H) || (AF.hi & 0x0F) > 9)
-// 			correction |= 0x06;
-// 		if (GetFlag(FLAG_C) || AF.hi > 0x99) {
-// 			correction |= 0x60;
-// 			carry = true;
-// 		}
-// 		AF.hi += correction;
-// 	} else {
-// 		if (GetFlag(FLAG_H))
-// 			correction |= 0x06;
-// 		if (GetFlag(FLAG_C))
-// 			correction |= 0x60;
-// 		AF.hi -= correction;
-// 	}
-
-// 	SetFlag(FLAG_Z, AF.hi == 0);
-// 	SetFlag(FLAG_H, false);
-// 	SetFlag(FLAG_C, carry || GetFlag(FLAG_C));
-// }
 
 void CPU::RLC()
 {
@@ -1143,7 +1069,7 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 	case 0xF9:
 		return {"LD", 2, &CPU::LD, {REG16, RegType::SP}, {REG16, RegType::HL}};
 	case 0xCB:
-		return HandleCBInstruction();
+		std::runtime_error("0xCB instruction, needs to be handled externally, ie. use HandleCBInstruction");
 	
 
 	default:
@@ -1288,9 +1214,8 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 	return {"XXX", 1, &CPU::NOP};
 }
 
-CPU::Instruction CPU::HandleCBInstruction()
+CPU::Instruction CPU::HandleCBInstruction(uint8_t opcode)
 {
-	uint8_t opcode = emu->read(PC); // TEMPORARY
 
 
 	// TODO: change cycle count for HL

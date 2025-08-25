@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <rlImGui.h>
 #include <imgui_impl_raylib.h>
+#include <print>
 
 #include "platformUtils.h"
 
@@ -34,6 +35,10 @@ Application::Application(const ApplicationSettings settings)
 	renderTexture = LoadRenderTexture(RESX, RESY);
 	tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
 	tileIndexTexture = LoadRenderTexture(32 * 8, 32 * 8);
+
+	img = GenImageColor(RESX, RESY, GREEN);
+
+	gameBoyOutput = LoadTextureFromImage(img);
 
 
 	ImGui::CreateContext();
@@ -69,6 +74,10 @@ Application::~Application()
 
 }
 
+void Application::ShowError(const std::string& errorMessage)
+{
+	DrawText(errorMessage.c_str(), GetScreenWidth() / 2, GetScreenHeight() / 2, 10, RED);
+}
 
 void Application::ImGuiDraw()
 {
@@ -95,10 +104,19 @@ void Application::ImGuiDraw()
 				std::string filePath = Utils::OpenFileDialog(GetWindowHandle(), ".gb\0");
 				if (!filePath.empty())
 				{
-					std::cout << "Loaded: " << filePath << std::endl;
-					emu_run = true;
-					emu.Reset();
-					emu.LoadROM(filePath);
+
+					try 
+					{
+						emu.LoadROM(filePath);
+						std::cout << "Loaded: " << filePath << std::endl;
+						emu_run = true;
+						emu.Reset();
+					}
+					catch (std::exception e)
+					{
+						Utils::ShowMessageBox(GetWindowHandle(), e.what(), "Error");
+					}
+					
 				}
 	
 				
@@ -496,8 +514,8 @@ void Application::Run()
 
 		EndTextureMode();
 
-
 		BeginTextureMode(renderTexture);
+		ClearBackground(BLACK);
 
 		Color defaultColor[4] = { WHITE, LIGHTGRAY, DARKGRAY, BLACK };
 		//Color defaultColor[4] = { {155, 188, 15, 255}, {139, 172, 15, 255}, {48, 98, 48, 255}, {15, 56, 15, 255} };
@@ -505,15 +523,22 @@ void Application::Run()
 		{
 			for (int x = 0; x < 160; x++)
 			{
-				uint8_t colorData = emu.ppu.videoBuffer[y * RESX + x];
-				DrawPixel(x, y, defaultColor[colorData]);
+				uint32_t colorData = emu.ppu.videoBuffer[y * RESX + x];
+				DrawPixel(x, y, GetColor(colorData));
 			}
 		}
+
+
+		DrawText(std::format("{}", GetFPS()).c_str(), 120, 0, 10, GREEN);
+
+		if (!m_ErrorMessage.empty())
+			DrawText(m_ErrorMessage.c_str(), 0, 0, 10, RED);
 
 		if (!emu_run)
 		{
 			DrawText("PAUSED", 0, 0, 2, RED);
 		}
+
 
  		EndTextureMode();
 

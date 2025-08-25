@@ -14,10 +14,8 @@
 
 namespace Utils
 {
-	// thx the cherno
 	std::string OpenFileDialog(void* windowHandle, std::string_view filter)
 	{
-		// WINDOWS ONLY
 		OPENFILENAME fileData;
 
 		char fileBuffer[300] = { 0 };
@@ -39,5 +37,9 @@ namespace Utils
 
 		return "";
 
+	}
+	void ShowMessageBox(void* windowHandle, std::string_view message, std::string_view caption)
+	{
+		MessageBox((HWND)windowHandle, message.data(), caption.data(), MB_OK);
 	}
 }

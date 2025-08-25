@@ -6,6 +6,7 @@
 #include <variant>
 #include <cstdint>
 #include <fstream>
+#include <array>
 
 
 class Emulator; // forward declare to avoid circular definition, need to to link read and write
@@ -130,14 +131,16 @@ public:
 	void SetFlag(uint8_t flag, uint8_t value);
 	uint8_t GetFlag(uint8_t flag);
 
-	Instruction jumptable[256];
-
 private:
 	Emulator* emu;
 	
 	std::ofstream debug_file;
 
-	Instruction HandleCBInstruction();
+	Instruction HandleCBInstruction(uint8_t opcode);
+
+	std::array<Instruction, 256> m_JumpTable;
+	std::array<Instruction, 256> m_CBPrefixJumpTable;
+
 
 	void cpu_push(uint8_t byte);
 	uint8_t cpu_pop();

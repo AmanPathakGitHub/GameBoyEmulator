@@ -90,8 +90,8 @@ void Emulator::UpdateFrame()
 
 
 		clock();
-		static int index = 0;
-		if(read(0xFF02) == 0x81)
+
+		if(read(0xFF02) == 0x81) // serial reading
 		{
 			char c = read(0xFF01);
 			msg += c;
@@ -139,20 +139,20 @@ uint8_t Emulator::GetButtonOutput()
 	uint8_t output = 0xCF;
 	// if the bit is ZERO
 
-	if (!buttonState.sel_button) 
+	if (buttonState.sel_button == 0) 
 	{
-		if (buttonState.select) output = ~(1 << 2);
-		if (buttonState.start) output = ~(1 << 3);
-		if (buttonState.b) output = ~(1 << 1);
-		if (buttonState.a) output = ~(1 << 0);
+		if (buttonState.select) output &= ~(1 << 2);
+		if (buttonState.start) output &= ~(1 << 3);
+		if (buttonState.b) output &= ~(1 << 1);
+		if (buttonState.a) output &= ~(1 << 0);
 	}
 
-	if (!buttonState.sel_dpad)
+	if (buttonState.sel_dpad == 0)
 	{
-		if (buttonState.up) output = ~(1 << 2);
-		if (buttonState.down) output = ~(1 << 3);
-		if (buttonState.left) output = ~(1 << 1);
-		if (buttonState.right) output = ~(1 << 0);
+		if (buttonState.up) output &= ~(1 << 2);
+		if (buttonState.down) output &= ~(1 << 3);
+		if (buttonState.left) output &= ~(1 << 1);
+		if (buttonState.right) output &= ~(1 << 0);
 	}
 
 	return output;
@@ -288,4 +288,5 @@ void Emulator::LoadROM(const std::string& filepath)
 {
 	cartridge = std::make_unique<Cartridge>(filepath);
 	romLoaded = true;
+
 }
