@@ -30,7 +30,7 @@ Application::Application(const ApplicationSettings settings)
 	//	maybe application can run at different fps to the emulator, e.g application runs at 120fps while emulation is at 60
 	//	right now both are locked to 60
 	//*/
-	SetTargetFPS(60); 
+	//SetTargetFPS(60); 
 
 	renderTexture = LoadRenderTexture(RESX, RESY);
 	tileMapTexture = LoadRenderTexture(24 * 8, 16 * 8);
@@ -215,7 +215,7 @@ void Application::HandleInput()
 
 	if (GetKeyPressed() != 0)
 	{
-		emu.cpu.RequestInterrupt(INT_JOYPAD);
+		emu.cpu.RequestInterrupt(CPU::JOYPAD);
 	}
 
 
@@ -245,10 +245,10 @@ void Application::ShowMemoryViewText()
 	if (!emu.romLoaded) return;
 
 	ImGui::Text("A: 0x%x", emu.cpu.AF.hi);
-	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_C) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "C");
-	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_H) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "H");
-	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_N) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "N");
-	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(FLAG_Z) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Z");
+	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(CPU::C) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "C");
+	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(CPU::H) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "H");
+	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(CPU::N) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "N");
+	ImGui::SameLine(); ImGui::TextColored(emu.cpu.GetFlag(CPU::Z) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Z");
 
 	ImGui::Text("B: 0x%x", emu.cpu.BC.hi);
 	ImGui::Text("C: 0x%x", emu.cpu.BC.lo);

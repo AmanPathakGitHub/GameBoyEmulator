@@ -150,11 +150,11 @@ void CPU::Clock()
 
     // If IME is enabled and not halted, service interrupts
     if (!halted && int_master_enabled) {
-        if (CheckInterrupt(INT_VBLANK, 0x40)) return;
-        if (CheckInterrupt(INT_LCD,    0x48)) return;
-        if (CheckInterrupt(INT_TIMER,  0x50)) return;
-        if (CheckInterrupt(INT_SERIAL, 0x58)) return;
-        if (CheckInterrupt(INT_JOYPAD, 0x60)) return;
+        if (CheckInterrupt(VBLANK, 0x40)) return;
+        if (CheckInterrupt(STAT,    0x48)) return;
+        if (CheckInterrupt(TIMER,  0x50)) return;
+        if (CheckInterrupt(SERIAL, 0x58)) return;
+        if (CheckInterrupt(JOYPAD, 0x60)) return;
     }
 
 	if(!halted)
@@ -175,7 +175,7 @@ void CPU::Clock()
 			//std::vector<std::string> d = Application::dissassemble(*emu, PC, PC + 5); // this is wrong???
 			uint8_t opcode = emu->read(PC++);			
 			/* debug_file << d[0] <<
-			  " Z: " << (int)GetFlag(FLAG_Z) << " C: " << (int)GetFlag(FLAG_C) << " N: " <<  (int)GetFlag(FLAG_N) << " H: " <<  (int)GetFlag(FLAG_H) 
+			  " Z: " << (int)GetFlag(Flag::Z) << " C: " << (int)GetFlag(Flag::C) << " N: " <<  (int)GetFlag(Flag::N) << " H: " <<  (int)GetFlag(Flag::H) 
 			  << " AF: 0x" << std::hex << (int)AF.reg << " BC: 0x" << std::hex << (int)BC.reg << " DE: 0x" << std::hex << (int)DE.reg << " HL: 0x" << std::hex << (int)HL.reg 
 			  << " SP: 0x" << std::hex << (int)SP 
 			  << "\n";
@@ -208,7 +208,7 @@ void CPU::Clock()
 }
 
 
-bool CPU::CheckInterrupt(uint8_t interupt_type, uint16_t address)
+bool CPU::CheckInterrupt(CPU::Interrupt interupt_type, uint16_t address)
 {
 	if((int_enable & interupt_type) && (int_flag & interupt_type))
 	{
@@ -224,18 +224,18 @@ bool CPU::CheckInterrupt(uint8_t interupt_type, uint16_t address)
 	return false;
 }
 
-void CPU::RequestInterrupt(uint8_t interrupt_type)
+void CPU::RequestInterrupt(CPU::Interrupt interrupt_type)
 {
 	int_flag |= interrupt_type;
 }
 
-uint8_t CPU::GetFlag(uint8_t flag)
+uint8_t CPU::GetFlag(Flag flag)
 {
 	return (AF.lo & (1 << flag)) != 0;
 }
 
 
-void CPU::SetFlag(uint8_t flag, uint8_t value)
+void CPU::SetFlag(Flag flag, uint8_t value)
 {
 	if (value == 1)
 	{
@@ -494,10 +494,10 @@ void CPU::LD_HL_SP()
 	int8_t value = fetch(m_CurrentInstruction.operand1) & 0xFF;
 	HL.reg = SP + value;
 
-	SetFlag(FLAG_Z, 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_H, ((SP & 0xF) + (value & 0xF)) > 0xF);
-    SetFlag(FLAG_C, ((SP & 0xFF) + (value & 0xFF)) > 0xFF);
+	SetFlag(Flag::Z, 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::H, ((SP & 0xF) + (value & 0xF)) > 0xF);
+    SetFlag(Flag::C, ((SP & 0xFF) + (value & 0xFF)) > 0xFF);
 }
 
 void CPU::INC()
@@ -515,9 +515,9 @@ void CPU::INC()
 		uint8_t result = value + 1;
 		writeOperand8(m_CurrentInstruction.operand1, (uint8_t)result);
 
-		SetFlag(FLAG_Z, (uint8_t)result == 0);
-		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, (((uint8_t)value & 0x0F) + 1) > 0xF);
+		SetFlag(Flag::Z, (uint8_t)result == 0);
+		SetFlag(Flag::N, 0);
+		SetFlag(Flag::H, (((uint8_t)value & 0x0F) + 1) > 0xF);
 	}
 
 }
@@ -535,9 +535,9 @@ void CPU::DEC()
 	{
 		uint8_t result = value - 1;
 		writeOperand8(m_CurrentInstruction.operand1, (uint8_t)result);
-		SetFlag(FLAG_Z, (uint8_t)result == 0);
-		SetFlag(FLAG_N, 1);
-		SetFlag(FLAG_H, ((uint8_t)value & 0x0F) == 0);
+		SetFlag(Flag::Z, (uint8_t)result == 0);
+		SetFlag(Flag::N, 1);
+		SetFlag(Flag::H, ((uint8_t)value & 0x0F) == 0);
 	}
 
 	
@@ -552,19 +552,19 @@ void CPU::ADD()
 	{
 		uint32_t temp = (uint32_t)value1 + (uint32_t)value2;
 		uint16_t result = (uint16_t)temp;
-		SetFlag(FLAG_C, temp > 0xFFFF);
-		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xFFF) + (value2 & 0xFFF)) > 0xFFF);
+		SetFlag(Flag::C, temp > 0xFFFF);
+		SetFlag(Flag::N, 0);
+		SetFlag(Flag::H, ((value1 & 0xFFF) + (value2 & 0xFFF)) > 0xFFF);
 		writeOperand16(m_CurrentInstruction.operand1, result);
 	}
 	else
 	{
 		uint16_t temp = value1 + value2;
 		uint8_t result = (uint8_t)temp;
-		SetFlag(FLAG_C, temp > 0xFF);
-		SetFlag(FLAG_Z, result == 0);
-		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xF) + (value2 & 0xF)) > 0xF);
+		SetFlag(Flag::C, temp > 0xFF);
+		SetFlag(Flag::Z, result == 0);
+		SetFlag(Flag::N, 0);
+		SetFlag(Flag::H, ((value1 & 0xF) + (value2 & 0xF)) > 0xF);
 		writeOperand8(m_CurrentInstruction.operand1, result);
 	}
 }
@@ -575,11 +575,11 @@ void CPU::ADD_SP()
 	uint16_t sp = SP;
 	uint16_t result = sp + value;
 
-	SetFlag(FLAG_Z, 0); // Always cleared
-	SetFlag(FLAG_N, 0); // Always cleared
+	SetFlag(Flag::Z, 0); // Always cleared
+	SetFlag(Flag::N, 0); // Always cleared
 
-	SetFlag(FLAG_H, ((sp & 0xF) + (value & 0xF)) > 0xF);
-	SetFlag(FLAG_C, ((sp & 0xFF) + (value & 0xFF)) > 0xFF);
+	SetFlag(Flag::H, ((sp & 0xF) + (value & 0xF)) > 0xF);
+	SetFlag(Flag::C, ((sp & 0xFF) + (value & 0xFF)) > 0xFF);
 
 	SP = result;
 }
@@ -588,16 +588,16 @@ void CPU::ADC()
 {
 	uint16_t value1 = fetch(m_CurrentInstruction.operand1);
 	uint16_t value2 = fetch(m_CurrentInstruction.operand2);
-	uint8_t carry = GetFlag(FLAG_C);
+	uint8_t carry = GetFlag(Flag::C);
 	
 	if(Is16Bit(m_CurrentInstruction.operand1))
 	{
 		uint32_t temp = (uint32_t)value1 + (uint32_t)value2 + (uint32_t)carry;
 		uint16_t result = temp & 0xFFFF;
 		
-		SetFlag(FLAG_C, temp > 0xFFFF);
-		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xFFF) + (value2 & 0xFFF) + carry) > 0xFFF);
+		SetFlag(Flag::C, temp > 0xFFFF);
+		SetFlag(Flag::N, 0);
+		SetFlag(Flag::H, ((value1 & 0xFFF) + (value2 & 0xFFF) + carry) > 0xFFF);
 
 		writeOperand16(m_CurrentInstruction.operand1, result);
 	}
@@ -605,10 +605,10 @@ void CPU::ADC()
 	{
 		uint16_t temp = value1 + value2 + carry;
 		uint8_t result = temp & 0xFF;
-		SetFlag(FLAG_C, temp > 0xFF);
-		SetFlag(FLAG_Z, result == 0);
-		SetFlag(FLAG_N, 0);
-		SetFlag(FLAG_H, ((value1 & 0xF) + (value2 & 0xF) + carry > 0xF));
+		SetFlag(Flag::C, temp > 0xFF);
+		SetFlag(Flag::Z, result == 0);
+		SetFlag(Flag::N, 0);
+		SetFlag(Flag::H, ((value1 & 0xF) + (value2 & 0xF) + carry > 0xF));
 		writeOperand8(m_CurrentInstruction.operand1, result);
 	}
 }
@@ -619,10 +619,10 @@ void CPU::SUB()
 	
 	uint16_t temp = (uint16_t)AF.hi - (uint16_t)value;
 	uint8_t result = (uint8_t)temp;
-	SetFlag(FLAG_C, AF.hi < value);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_N, 1);
-	SetFlag(FLAG_H, (AF.hi & 0xF) < (value & 0xF));
+	SetFlag(Flag::C, AF.hi < value);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::N, 1);
+	SetFlag(Flag::H, (AF.hi & 0xF) < (value & 0xF));
 
 	//writeOperand8(m_CurrentInstruction.operand1, result);
 	AF.hi = result;
@@ -632,15 +632,15 @@ void CPU::SBC()
 {
 	uint8_t value1 = fetch(m_CurrentInstruction.operand1);
 	uint8_t value2 = fetch(m_CurrentInstruction.operand2);
-	uint8_t carry = GetFlag(FLAG_C);
+	uint8_t carry = GetFlag(Flag::C);
 	
 	uint16_t temp = value1 - value2 - carry;
 	uint8_t result = temp & 0xFF;
 
-	SetFlag(FLAG_C, (int16_t)temp < 0);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_N, 1);
-	SetFlag(FLAG_H, (value1 & 0xF) - (value2 & 0xF) - carry < 0);
+	SetFlag(Flag::C, (int16_t)temp < 0);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::N, 1);
+	SetFlag(Flag::H, (value1 & 0xF) - (value2 & 0xF) - carry < 0);
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
 }
@@ -649,20 +649,20 @@ void CPU::AND()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	AF.hi &= value;
-	SetFlag(FLAG_Z, AF.hi == 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_H, 1);
-	SetFlag(FLAG_C, 0);
+	SetFlag(Flag::Z, AF.hi == 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::H, 1);
+	SetFlag(Flag::C, 0);
 }
 
 void CPU::XOR()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	AF.hi ^= value;
-	SetFlag(FLAG_Z, AF.hi == 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_C, 0); 
+	SetFlag(Flag::Z, AF.hi == 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::C, 0); 
 }
 
 
@@ -670,20 +670,20 @@ void CPU::OR()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	AF.hi |= value;
-	SetFlag(FLAG_Z, AF.hi == 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_C, 0); 
+	SetFlag(Flag::Z, AF.hi == 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::C, 0); 
 }
 
 void CPU::CP()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	uint8_t result = AF.hi - value;
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_N, 1);
-	SetFlag(FLAG_C, AF.hi < value);
-	SetFlag(FLAG_H, (AF.hi & 0xF) < (value & 0xF));
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::N, 1);
+	SetFlag(Flag::C, AF.hi < value);
+	SetFlag(Flag::H, (AF.hi & 0xF) < (value & 0xF));
 }
 
 
@@ -742,22 +742,22 @@ void CPU::RLCA()
 	bool isBit7Set = (AF.hi & 0b10000000) != 0;
 	AF.hi = (AF.hi << 1) | isBit7Set;
 
-	SetFlag(FLAG_C, isBit7Set);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_Z, 0);
+	SetFlag(Flag::C, isBit7Set);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::Z, 0);
 }
 
 void CPU::RLA()
 {
-	uint8_t bit0 = GetFlag(FLAG_C);
+	uint8_t bit0 = GetFlag(Flag::C);
 	uint8_t bit7 = (AF.hi & 0b10000000) != 0;
 	AF.hi = (AF.hi << 1) | bit0;
 
-	SetFlag(FLAG_C, bit7);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_Z, 0);
+	SetFlag(Flag::C, bit7);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::Z, 0);
 }
 
 void CPU::RRCA()
@@ -765,23 +765,23 @@ void CPU::RRCA()
 	uint8_t bit0 = AF.hi & 1;
 	AF.hi = (bit0 << 7) | (AF.hi >> 1);
 
-	SetFlag(FLAG_C, bit0);	
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_Z, 0);
+	SetFlag(Flag::C, bit0);	
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::Z, 0);
 }
 
 void CPU::RRA()
 {
-	uint8_t carry_in = GetFlag(FLAG_C) ? 0x80 : 0;
+	uint8_t carry_in = GetFlag(Flag::C) ? 0x80 : 0;
 	uint8_t carry_out = AF.hi & 0x01;
 
 	AF.hi = (AF.hi >> 1) | carry_in;
 
-	SetFlag(FLAG_C, carry_out);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_Z, 0); // Always cleared by RRA
+	SetFlag(Flag::C, carry_out);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::Z, 0); // Always cleared by RRA
 }
 
 void CPU::JR()
@@ -796,24 +796,24 @@ void CPU::JR()
 
 void CPU::SCF()
 {
-	SetFlag(FLAG_C, 1);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, 1);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::CPL()
 {
 	AF.hi ^= 0xFF;
 
-	SetFlag(FLAG_H, 1);
-	SetFlag(FLAG_N, 1);
+	SetFlag(Flag::H, 1);
+	SetFlag(Flag::N, 1);
 }
 
 void CPU::CCF()
 {
-	SetFlag(FLAG_C, !GetFlag(FLAG_C));
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, !GetFlag(Flag::C));
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::STOP()
@@ -856,10 +856,10 @@ void CPU::DAA()
 	uint8_t u = 0;
 	bool fc = false;
 
-	if(GetFlag(FLAG_H) || (!GetFlag(FLAG_N) && (AF.hi & 0xF) > 9))
+	if(GetFlag(Flag::H) || (!GetFlag(Flag::N) && (AF.hi & 0xF) > 9))
 		u |= 0x06;
 
-	if(GetFlag(FLAG_C) || (!GetFlag(FLAG_N) && (AF.hi > 0x99)))
+	if(GetFlag(Flag::C) || (!GetFlag(Flag::N) && (AF.hi > 0x99)))
 	{
 		u |= 0x60;
 		fc = 1;
@@ -867,16 +867,16 @@ void CPU::DAA()
 
 	int a = AF.hi;
 
-	if (GetFlag(FLAG_N))
+	if (GetFlag(Flag::N))
 		a -= u;
 	else
 		a += u;
 
 	AF.hi = static_cast<uint8_t>(a);
 
-	SetFlag(FLAG_Z, AF.hi == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_C, GetFlag(FLAG_N) ? GetFlag(FLAG_C) : fc);
+	SetFlag(Flag::Z, AF.hi == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::C, GetFlag(Flag::N) ? GetFlag(Flag::C) : fc);
 
 	
 }
@@ -890,10 +890,10 @@ void CPU::RLC()
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::RRC()
@@ -904,38 +904,38 @@ void CPU::RRC()
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::RL()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	uint8_t carryOut = (value & (1 << 7)) ? 1 : 0;
-	uint8_t result = (value << 1) | GetFlag(FLAG_C);
+	uint8_t result = (value << 1) | GetFlag(Flag::C);
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::RR()
 {
 	uint8_t value = fetch(m_CurrentInstruction.operand1);
 	uint8_t carryOut = value & 1;
-	uint8_t result = (value >> 1) | (GetFlag(FLAG_C) << 7);
+	uint8_t result = (value >> 1) | (GetFlag(Flag::C) << 7);
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::SLA()
@@ -946,10 +946,10 @@ void CPU::SLA()
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::SRA()
@@ -960,10 +960,10 @@ void CPU::SRA()
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::SWAP()
@@ -973,10 +973,10 @@ void CPU::SWAP()
 	uint8_t result = ((value & 0xF) << 4) | (value >> 4);
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_C, 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::C, 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 }
 
 void CPU::SRL()
@@ -988,10 +988,10 @@ void CPU::SRL()
 
 	writeOperand8(m_CurrentInstruction.operand1, result);
 
-	SetFlag(FLAG_C, carryOut);
-	SetFlag(FLAG_Z, result == 0);
-	SetFlag(FLAG_H, 0);
-	SetFlag(FLAG_N, 0);
+	SetFlag(Flag::C, carryOut);
+	SetFlag(Flag::Z, result == 0);
+	SetFlag(Flag::H, 0);
+	SetFlag(Flag::N, 0);
 
 }
 
@@ -1000,9 +1000,9 @@ void CPU::BIT()
 	uint8_t bit = m_CurrentInstruction.operand1.meta;
 	uint8_t value = fetch(m_CurrentInstruction.operand2);
 	uint8_t result = (value & (1 << bit)) ? 1 : 0;
-	SetFlag(FLAG_Z, !result);
-	SetFlag(FLAG_N, 0);
-	SetFlag(FLAG_H, 1);
+	SetFlag(Flag::Z, !result);
+	SetFlag(Flag::N, 0);
+	SetFlag(Flag::H, 1);
 }
 
 void CPU::SET()
@@ -1359,10 +1359,10 @@ bool CPU::checkCond(CondType cond)
 	switch (cond)
 	{
 		case CondType::NONE: return true;
-		case CondType::NZ: return !GetFlag(FLAG_Z);
-		case CondType::Z: return GetFlag(FLAG_Z);
-		case CondType::NC: return !GetFlag(FLAG_C);
-		case CondType::C: return GetFlag(FLAG_C);
+		case CondType::NZ: return !GetFlag(Flag::Z);
+		case CondType::Z: return GetFlag(Flag::Z);
+		case CondType::NC: return !GetFlag(Flag::C);
+		case CondType::C: return GetFlag(Flag::C);
 	}
 
 	std::cout << "Invalid condition!!" << std::endl;

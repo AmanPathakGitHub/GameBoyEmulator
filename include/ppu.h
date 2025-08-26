@@ -47,25 +47,30 @@ private:
 };
 
 
-// maybe use enums for this
-#define LCD_PPUMODE 0b11
-#define LCD_LYC_LY 0b100
-#define LCD_MODE0 0b1000
-#define LCD_MODE1 0b10000
-#define LCD_MODE2 0b100000
-#define LCD_LYC 0b1000000
-
-#define LCDC_BG_WINDOW_ENABLE 0b1
-#define LCDC_OBJ_ENABLE 0b10
-#define LCDC_OBJ_SIZE 0b100
-#define LCDC_BG_TILEMAP 0b1000
-#define LCDC_BG_WINDOW_TILES 0b10000
-#define LCDC_WINDOW_ENABLE 0b100000
-#define LCDC_WINDOW_TILEMAP 0b1000000
-#define LCDC_LCD_PPU_ENABLE 0b10000000
-
 struct LCD
 {
+    // Bits to access the certain parts of the status register
+    enum Status : uint8_t {
+        PPUMODE = 0b11,
+        LYC_LY = 0b100,
+        MODE0 = 0b1000,
+        MODE1 = 0b10000,
+        MODE2 = 0b100000,
+        LYC = 0b1000000
+
+    };
+
+    enum Control : uint8_t {
+        BG_WINDOW_ENABLE = 0b1,
+        OBJ_ENABLE = 0b10,
+        OBJ_SIZE = 0b100,
+        BG_TILEMAP = 0b1000,
+        BG_WINDOW_TILES = 0b10000,
+        WINDOW_ENABLE = 0b100000,
+        WINDOW_TILEMAP = 0b1000000,
+        LCD_PPU_ENABLE = 0b10000000
+    };
+
     LCD();
 
     uint8_t read(uint16_t address);
@@ -75,9 +80,11 @@ struct LCD
     
     void Reset();
 
-    inline bool GetStatusBit(uint8_t statusType) { return !!(status & statusType); }
-    void SetStatusBit(uint8_t statusType, uint8_t set);
-    inline bool GetControlBit(uint8_t controlType) const { return !!(lcdc & controlType); }
+    
+    bool GetStatusBit(const Status statusType) const noexcept { return !!(status & statusType); }
+    bool GetControlBit(const Control controlType) const noexcept { return !!(lcdc & controlType); }
+
+    void SetStatusBit(const Status statusType, uint8_t set);
 
 
     Emulator* emu;

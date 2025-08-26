@@ -132,7 +132,7 @@ void MBC1::save()
 {
 	std::ofstream fs(title + ".sav", std::ios::binary);
 
-	if (!fs.is_open()) __debugbreak();
+	if (!fs.is_open()) throw std::runtime_error("File could not be open");
 
 	std::cout << externalRAMSize << std::endl;
 

@@ -57,7 +57,7 @@ void Timer::tick()
         {
             tima = tma;
             // request interrupt
-            cpu->RequestInterrupt(INT_TIMER);
+            cpu->RequestInterrupt(CPU::Interrupt::TIMER);
         }
             
     }

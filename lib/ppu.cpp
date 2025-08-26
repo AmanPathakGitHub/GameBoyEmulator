@@ -91,7 +91,7 @@ void PPU::ConnectToEmulator(Emulator* emu)
 void PPU::SwitchMode(Mode mode)
 {
     this->mode = mode;
-    lcd->SetStatusBit(LCD_PPUMODE, mode);
+    lcd->SetStatusBit(LCD::Status::PPUMODE, mode);
 }
 
 void PPU::HandleModeOAMScan()
@@ -103,7 +103,7 @@ void PPU::HandleModeOAMScan()
         {
             if(sprite_buffer.size() >= 10) break;
 
-            uint8_t spriteHeight = lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8;
+            uint8_t spriteHeight = lcd->GetControlBit(LCD::Control::OBJ_SIZE) ? 16 : 8;
             if (!(lcd->ly + 16 < oam_sprite.y + spriteHeight)) continue;
             if(oam_sprite.x <= 0) continue;
             if(!(lcd->ly + 16 >= oam_sprite.y)) continue;
@@ -142,16 +142,16 @@ void PPU::HandleModeHBLANK()
             windowLineCounter = 0;
             SwitchMode(VBLANK);
 
-            emu->cpu.RequestInterrupt(INT_VBLANK);
+            emu->cpu.RequestInterrupt(CPU::Interrupt::VBLANK);
 
-            if (lcd->GetStatusBit(LCD_MODE1)) emu->cpu.RequestInterrupt(INT_LCD);
+            if (lcd->GetStatusBit(LCD::Status::MODE1)) emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
 
         } 
         else
         {
             SwitchMode(OAMSCAN);
             sprite_buffer.clear();
-            if (lcd->GetStatusBit(LCD_MODE2))  emu->cpu.RequestInterrupt(INT_LCD);
+            if (lcd->GetStatusBit(LCD::Status::MODE2))  emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
         }
 
         dots = 0;
@@ -171,7 +171,7 @@ void PPU::HandleModeVBLANK()
             lcd->ly = 0;
             SwitchMode(OAMSCAN);
             windowTriggered = false;
-            if (lcd->GetStatusBit(LCD_MODE2)) emu->cpu.RequestInterrupt(INT_LCD);
+            if (lcd->GetStatusBit(LCD::Status::MODE2)) emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
         }
         dots = 0;
 
@@ -199,9 +199,9 @@ void PPU::HandleModeDrawPixels()
     {
         if (lcd->ly == lcd->lyc)
         {
-            lcd->SetStatusBit(LCD_LYC_LY, 1);
+            lcd->SetStatusBit(LCD::Status::LYC_LY, 1);
 
-            if (lcd->GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
+            if (lcd->GetStatusBit(LCD::Status::LYC)) emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
         }
         SwitchMode(HBLANK);
 
@@ -211,19 +211,19 @@ void PPU::HandleModeDrawPixels()
         sprite_pixels.fill({});
 
 
-        if (lcd->GetStatusBit(LCD_MODE0)) emu->cpu.RequestInterrupt(INT_LCD);
+        if (lcd->GetStatusBit(LCD::Status::MODE0)) emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
 
     }   
 }
 
 void PPU::FetchSpritePixels()
 {
-    if (!lcd->GetControlBit(LCDC_OBJ_ENABLE)) return;
+    if (!lcd->GetControlBit(LCD::Control::OBJ_ENABLE)) return;
 
     for (int i = 0; i < sprite_buffer.size(); i++)
     {
         
-        uint8_t tileHeight = lcd->GetControlBit(LCDC_OBJ_SIZE) ? 16 : 8;
+        uint8_t tileHeight = lcd->GetControlBit(LCD::Control::OBJ_SIZE) ? 16 : 8;
         bool isTallSprite = tileHeight == 16;
         const OAMEntry& sprite = sprite_buffer[i].spriteData;  
         
@@ -271,7 +271,7 @@ bool PPU::WindowVisible()
     uint8_t wx = lcd->windowX;
     uint8_t wy = lcd->windowY;
 
-    return lcd->GetControlBit(LCDC_WINDOW_ENABLE) && wx >= 0 && wx < RESX && wy >= 0 && wy < RESY;
+    return lcd->GetControlBit(LCD::Control::WINDOW_ENABLE) && wx >= 0 && wx < RESX && wy >= 0 && wy < RESY;
 }
 
 void PPU::FetchWindowPixels()
@@ -279,31 +279,31 @@ void PPU::FetchWindowPixels()
     if (lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14) // -14 is because of a hardware quirk/timing of when pixels are pushed
         return;
     
-    uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
+    uint16_t tileIndexAddress = lcd->GetControlBit(LCD::Control::WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
 
     uint16_t fetcherX = ((fetchedX) - (lcd->windowX - 7) / 8) & 0x1F;
     uint16_t fetcherY = (lcd->ly - lcd->windowY);
     tileIndexAddress += 32 * (fetcherY / 8) + fetcherX;
     uint8_t tileIndex = emu->read(tileIndexAddress);
 
-    tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+    tileAddress = lcd->GetControlBit(LCD::Control::BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
 
 }
 
 void PPU::FetchBackGroundPixels()
 {
 
-    if (lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+    if (lcd->GetControlBit(LCD::Control::BG_WINDOW_ENABLE))
     {
         // wrap in function
-        uint16_t tileIndexAddress = lcd->GetControlBit(LCDC_BG_TILEMAP) ? 0x9C00 : 0x9800;
+        uint16_t tileIndexAddress = lcd->GetControlBit(LCD::Control::BG_TILEMAP) ? 0x9C00 : 0x9800;
 
         uint16_t fetcherX = (lcd->scrollX / 8 + fetchedX) & 0x1F;
         uint16_t fetcherY = (lcd->scrollY + lcd->ly) & 255;
 
         tileIndexAddress += fetcherY / 8 * 32 + fetcherX;
         uint8_t tileIndex = emu->read(tileIndexAddress);
-        tileAddress = lcd->GetControlBit(LCDC_BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+        tileAddress = lcd->GetControlBit(LCD::Control::BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
 
         if (WindowVisible())
             FetchWindowPixels();
@@ -329,7 +329,7 @@ void PPU::FetchBackGroundPixels()
 
             uint8_t col = (hi << 1) | lo;
 
-            if (!lcd->GetControlBit(LCDC_BG_WINDOW_ENABLE))
+            if (!lcd->GetControlBit(LCD::Control::BG_WINDOW_ENABLE))
                 col = 0;
 
             background_pixels.emplace(lcd->GetColor(col, lcd->bgp));
@@ -522,9 +522,9 @@ void LCD::ConnectToEmulator(Emulator* emu)
     this->emu = emu;
 }
 
-void LCD::SetStatusBit(uint8_t statusType, uint8_t set)
+void LCD::SetStatusBit(const LCD::Status statusType, uint8_t set)
 {
-    if (statusType == LCD_PPUMODE)
+    if (statusType == Status::PPUMODE)
     {
         status = (status & ~(0b11)) | set;
         return;
@@ -543,12 +543,12 @@ void PPU::IncrementLY()
 
     if (lcd->ly == lcd->lyc)
     {
-        lcd->SetStatusBit(LCD_LYC_LY, 1);
+        lcd->SetStatusBit(LCD::Status::LYC_LY, 1);
 
-        if (lcd->GetStatusBit(LCD_LYC)) emu->cpu.RequestInterrupt(INT_LCD);
+        if (lcd->GetStatusBit(LCD::Status::LYC)) emu->cpu.RequestInterrupt(CPU::Interrupt::STAT);
     }
     else
-        lcd->SetStatusBit(LCD_LYC_LY, 0);
+        lcd->SetStatusBit(LCD::Status::LYC_LY, 0);
 }
 
 uint8_t LCD::GetColor(uint8_t index, uint8_t pallete)

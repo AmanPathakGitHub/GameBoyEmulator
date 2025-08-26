@@ -11,19 +11,6 @@
 
 class Emulator; // forward declare to avoid circular definition, need to to link read and write
 
-#define FLAG_C 4
-#define FLAG_H 5
-#define FLAG_N 6
-#define FLAG_Z 7
-
-#define INT_VBLANK 0b1
-#define INT_LCD 0b10
-#define INT_TIMER 0b100
-#define INT_SERIAL 0b1000
-#define INT_JOYPAD 0b10000
-
-
-
 class CPUTest;
 
 class CPU
@@ -36,8 +23,7 @@ public:
 
 	void Reset();
 	void Clock();
-	bool CheckInterrupt(uint8_t interupt_type, uint16_t address);
-	void RequestInterrupt(uint8_t interrupt_type);
+	
 
 
 	bool halted = false;
@@ -46,6 +32,25 @@ public:
 
 	uint8_t int_enable = 0;
 	uint8_t int_flag = 0;
+
+	enum Interrupt
+	{
+		VBLANK = 1,
+		STAT = 1 << 1,
+		TIMER = 1 << 2,
+		SERIAL = 1 << 3,
+		JOYPAD = 1 << 4
+	};
+
+	// represents what bit they were at
+	// done before i realised i could have done it like Interrupt
+	enum Flag 
+	{
+		C = 4,
+		H = 5,
+		N = 6,
+		Z = 7
+	};
 
 	union Register
 	{
@@ -128,8 +133,11 @@ public:
 	Instruction InstructionByOpcode(uint8_t opcode);
 	uint8_t m_Cycles = 0;
 
-	void SetFlag(uint8_t flag, uint8_t value);
-	uint8_t GetFlag(uint8_t flag);
+	void SetFlag(Flag flag, uint8_t value);
+	uint8_t GetFlag(Flag flag);
+
+	bool CheckInterrupt(Interrupt interupt_type, uint16_t address);
+	void RequestInterrupt(Interrupt interrupt_type);
 
 private:
 	Emulator* emu;
