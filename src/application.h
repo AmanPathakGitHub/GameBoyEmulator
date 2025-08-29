@@ -1,12 +1,16 @@
 #pragma once
 #include <cstdint>
 #include "emulator.h"
+#include "panels/panel.h"
 
 #include <fstream>
 
 struct GLFWwindow;
 
 #include <raylib.h>
+
+template<typename T>
+concept PanelType = std::is_base_of_v<Panel, T>;
 
 struct ApplicationSettings
 {
@@ -34,8 +38,7 @@ private:
 	Emulator emu;
 
 	RenderTexture2D renderTexture;
-	RenderTexture2D tileMapTexture;
-	RenderTexture2D tileIndexTexture;
+
 	Texture2D gameBoyOutput;
 	Image img;
 
@@ -44,21 +47,14 @@ private:
 
 	std::string m_ErrorMessage;
 
+	std::vector<std::unique_ptr<Panel>> m_Panels;
+
+
+	template<PanelType T>
+	void CreatePanel(T* panel);
+
 	void ImGuiDraw();
 	void HandleInput();
-
-	void display_tile(RenderTexture2D texture, uint16_t startLocation, uint16_t tileNum, int x, int y);
-
-	bool showDisassembly = false;
-	bool showMemoryView = false;
-	bool showTileMap = false;
-	bool showTileIndexMap = false;
-
-	int tileIndexBaseAddress = 0x8000;
-
-	void ShowMemoryViewText();
-	void ShowDisassemblyText();
-	void ShowTileIndexMap();
 
 	void ShowError(const std::string& errorMessage);
 
