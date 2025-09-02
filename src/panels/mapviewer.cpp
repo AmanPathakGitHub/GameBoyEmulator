@@ -45,14 +45,12 @@ void MapViewer::Update()
 void MapViewer::UpdatePixelBuffer(uint16_t startLocation)
 {
 
-	std::array<uint32_t, 4> defaultColors = { 0xFFFFFFFF, 0xFFA9A9A9, 0xFF545454, 0x00000000 }; // i think endianess might matter here
-
 	for (int y = 0; y < 32; y++)
 	{
 		for (int x = 0; x < 32; x++)
 		{
 			uint16_t index = y * 32 + x;
-			uint16_t address = 0x9800 + index;
+			uint16_t address = 0x9C00 + index;
 			uint8_t tileIndex = m_Emulator.read(address);
 
 			for (int lineY = 0; lineY < 16; lineY += 2)
@@ -64,7 +62,7 @@ void MapViewer::UpdatePixelBuffer(uint16_t startLocation)
 				{
 					uint8_t color = !!(lo & (1 << bit)) | (!!(hi & (1 << bit)) << 1);
 
-					m_PixelBuffer[((y * 8 + lineY / 2) * MAPVIEWER_WIDTH) + (x * 8 + (7 - bit))] = defaultColors[color];
+					m_PixelBuffer[((y * 8 + lineY / 2) * MAPVIEWER_WIDTH) + (x * 8 + (7 - bit))] = DEFAULT_COLORS[color];
 
 				}
 			}

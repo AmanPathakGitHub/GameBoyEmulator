@@ -32,7 +32,7 @@ void CPU::ConnectCPUToBus(Emulator* emu)
 }
 
 
-std::string_view RegTypeToString(const CPU::RegType& reg)
+std::string_view RegTypeToString(const CPU::RegType reg)
 {
 	switch (reg)
 	{
@@ -55,7 +55,7 @@ std::string_view RegTypeToString(const CPU::RegType& reg)
 	}
 }
 
-std::string_view CondTypeToString(const CPU::CondType& cond)
+std::string_view CondTypeToString(const CPU::CondType cond)
 {
 	switch (cond)
 	{

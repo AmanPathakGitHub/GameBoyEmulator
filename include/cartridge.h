@@ -36,8 +36,8 @@ public:
 	void WriteCart(uint16_t address, uint8_t data);
 
 private:
-	CartridgeHeader header;
-	std::unique_ptr<MBC> memoryBankController;
+	CartridgeHeader m_Header;
+	std::unique_ptr<MBC> m_MemoryBankController;
 	uint8_t* m_CartData; // all cart memory including whats in the different banks
 	uint32_t m_ROM_size; // size in bytes
 

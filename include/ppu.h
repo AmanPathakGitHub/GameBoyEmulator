@@ -5,8 +5,10 @@
 #include <array>
 #include "cpu.h"
 
-static const int RESX = 160;
-static const int RESY = 144;
+constexpr int RESX = 160;
+constexpr int RESY = 144;
+
+constexpr std::array<uint32_t, 4> DEFAULT_COLORS = { 0xFFFFFFFF, 0xFFA9A9A9, 0xFF545454, 0x00000000 };
 
 struct OAMEntry
 {
@@ -144,9 +146,9 @@ public:
         DRAWPIXELS
     };
 
-    uint32_t videoBuffer[RESX * RESY];
+    std::array<uint32_t, RESX * RESY> videoBuffer;
 
-    uint8_t windowLineCounter = 0;
+    uint16_t windowLineCounter = 0;
 
 
 private:
@@ -165,9 +167,9 @@ private:
 
 
     uint16_t dots = 0;
-    uint16_t scanline = 0; // this should be the same as ly register?
 	uint16_t scanlineX = 0; // this is the x position in the scanline, used for pixel drawing
     uint16_t pushedX = 0;
+    uint8_t tileY = 0;
 
 
     std::vector<Sprite> sprite_buffer;
@@ -183,8 +185,6 @@ private:
 
     uint8_t fetchedX = 0;
     uint16_t tileAddress;
-    uint8_t tileLo;
-    uint8_t tileHi;
 
     bool windowTriggered = false;
 

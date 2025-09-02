@@ -61,9 +61,10 @@ public:
 	std::array<uint8_t, 0x2000> wram;
 	std::array<uint8_t, 0x80> hram;
 
-	uint64_t m_SystemTicks = 0;
 
 	bool romLoaded = false;
+	uint64_t m_SystemTicks = 0;
+
 
 private:
 	std::unique_ptr<Cartridge> cartridge;

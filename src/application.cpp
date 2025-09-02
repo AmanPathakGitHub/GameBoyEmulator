@@ -34,13 +34,11 @@ Application::Application(const ApplicationSettings settings)
 	//	maybe application can run at different fps to the emulator, e.g application runs at 120fps while emulation is at 60
 	//	right now both are locked to 60
 	//*/
-	//SetTargetFPS(60); 
+	SetTargetFPS(60); 
 
 	renderTexture = LoadRenderTexture(RESX, RESY);
 
-	img = GenImageColor(RESX, RESY, GREEN);
-
-	gameBoyOutput = LoadTextureFromImage(img);
+	m_Panels.reserve(4); // total of 4 maximum panels
 
 
 
@@ -77,10 +75,6 @@ Application::~Application()
 
 }
 
-void Application::ShowError(const std::string& errorMessage)
-{
-	DrawText(errorMessage.c_str(), GetScreenWidth() / 2, GetScreenHeight() / 2, 10, RED);
-}
 
 template<PanelType T>
 void Application::CreatePanel(T* panel)
@@ -106,7 +100,7 @@ void Application::ImGuiDraw()
 
 	ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + (windowSize.x - scaledSize.x) / 2, ImGui::GetCursorPosY() + (windowSize.y - scaledSize.y) / 2));
 
-	ImGui::Image((ImTextureID)renderTexture.texture.id, scaledSize);
+	ImGui::Image((ImTextureID)renderTexture.texture.id, scaledSize, ImVec2(0, 1), ImVec2(1, 0));
 
 	ImGui::End();
 
@@ -145,8 +139,10 @@ void Application::ImGuiDraw()
 				CreatePanel<Disassembler>(new Disassembler{ emu, "Disassembly" });
 			if (ImGui::MenuItem("TileMap"))
 				CreatePanel<TileViewer>(new TileViewer{ emu });
-			if (ImGui::MenuItem("TileMap Indexes"))
+			if (ImGui::MenuItem("Map Viewer"))
 				CreatePanel<MapViewer>(new MapViewer{ emu });
+			if (ImGui::MenuItem("Toggle FPS"))
+				m_ShowFPS = !m_ShowFPS;
 
 			ImGui::EndMenu();
 		}
@@ -155,6 +151,21 @@ void Application::ImGuiDraw()
 	}
 	
 
+}
+
+std::array<uint32_t, RESX * RESY> Application::GetVideoBuffer()
+{
+	std::array<uint32_t, RESX* RESY> outputArray;
+	int index = 0;
+	for (int y = RESY - 1; y >= 0; y--)
+	{
+		for (int x = 0; x < RESX; x++)
+		{
+			outputArray[index++] = emu.ppu.videoBuffer[y * RESX + x];
+		}
+	}
+
+	return outputArray;
 }
 
 void Application::HandleInput()
@@ -245,32 +256,12 @@ void Application::Run()
 		if (emu_run && emu.romLoaded) emu.UpdateFrame();
 		ImGuiDraw();
 
-		UpdateTexture(renderTexture.texture, emu.ppu.videoBuffer);
+		UpdateTexture(renderTexture.texture, GetVideoBuffer().data());
 
 		BeginTextureMode(renderTexture);
-		//ClearBackground(BLACK);
 
-		//Color defaultColor[4] = { WHITE, LIGHTGRAY, DARKGRAY, BLACK };
-		////Color defaultColor[4] = { {155, 188, 15, 255}, {139, 172, 15, 255}, {48, 98, 48, 255}, {15, 56, 15, 255} };
-		//for (int y = 0; y < 144; y++)
-		//{
-		//	for (int x = 0; x < 160; x++)
-		//	{
-		//		uint32_t colorData = emu.ppu.videoBuffer[y * RESX + x];
-		//		DrawPixel(x, y, GetColor(colorData));
-		//	}
-		//}
-
-
-		DrawText(std::format("{}", GetFPS()).c_str(), 120, 0, 10, GREEN);
-
-		//if (!m_ErrorMessage.empty())
-		//	DrawText(m_ErrorMessage.c_str(), 0, 0, 10, RED);
-
-		//if (!emu_run)
-		//{
-		//	DrawText("PAUSED", 0, 0, 2, RED);
-		//}
+		if(m_ShowFPS)
+			DrawText(std::format("{}", GetFPS()).c_str(), 120, 0, 10, GREEN);
 
 
  		EndTextureMode();

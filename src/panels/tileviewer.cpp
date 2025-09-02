@@ -2,8 +2,8 @@
 
 #include <imgui.h>
 
-constexpr const char* TITLE = "Tile Viewer";
-constexpr int SCALE = 3;
+static constexpr const char* TITLE = "Tile Viewer";
+static constexpr int SCALE = 3;
 
 TileViewer::TileViewer(Emulator& emu)
 	: Panel(TITLE), m_Emulator(emu), m_PixelBuffer()
@@ -31,8 +31,7 @@ void TileViewer::UpdatePixelBuffer()
 {
 	constexpr uint16_t startLocation = 0x8000;
 
-	int tileNum = 0;
-	std::array<uint32_t, 4> defaultColors = { 0xFFFFFFFF, 0xFFA9A9A9, 0xFF545454, 0x00000000 }; // i think endianess might matter here
+	int tileNum = 0;	
 
 	for (int y = 0; y < TILEVIEWER_HEIGHT; y += 8)
 	{
@@ -47,7 +46,7 @@ void TileViewer::UpdatePixelBuffer()
 				{
 					uint8_t color = !!(lo & (1 << bit)) | (!!(hi & (1 << bit)) << 1);
 
-					m_PixelBuffer[((y + lineY / 2) * TILEVIEWER_WIDTH) + (x + (7 - bit))] = defaultColors[color];
+					m_PixelBuffer[((y + lineY / 2) * TILEVIEWER_WIDTH) + (x + (7 - bit))] = DEFAULT_COLORS[color];
 
 				}
 			}

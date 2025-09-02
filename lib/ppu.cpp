@@ -4,23 +4,26 @@
 #include <iostream>
 #include <cstring>
 #include <algorithm>
+#include <print>
 
 PPU::PPU()
 {
     memset(vram, 0, 0x2000);
-    memset(videoBuffer, 3, RESX * RESY * 4);
     memset(oam_ram, 0, sizeof(OAMEntry) * 40);
 
     background_pixels = {};
     sprite_buffer.reserve(10);
+
+    std::fill(videoBuffer.begin(), videoBuffer.end(), 3);
 
 }
 
 void PPU::Reset()
 {
     memset(vram, 0, 0x2000);
-    memset(videoBuffer, 0, RESX * RESY);
     memset(oam_ram, 0, sizeof(OAMEntry) * 40);
+    std::fill(videoBuffer.begin(), videoBuffer.end(), 3);
+
 
     for (int i = 0; i < sprite_pixels.size(); i++)
         sprite_pixels[i] = {};
@@ -40,7 +43,7 @@ void PPU::Reset()
     scanlineX = 0; // this is the x position in the scanline, used for pixel drawing
     pushedX = 0;
 
-    windowLineCounter = 0;
+    //windowLineCounter = 0;
 
 }
 
@@ -64,8 +67,6 @@ void PPU::tick()
         break;
     
     }
-
-
 
     dots++;
 
@@ -124,6 +125,7 @@ void PPU::HandleModeOAMScan()
         scanlineX = 0;
         pushedX = 0;
         fetch_state = GetTile;
+
         SwitchMode(DRAWPIXELS);
     }
 
@@ -139,7 +141,7 @@ void PPU::HandleModeHBLANK()
 
         if (lcd->ly >= RESY)
         {
-            windowLineCounter = 0;
+            //windowLineCounter = 0;
             SwitchMode(VBLANK);
 
             emu->cpu.RequestInterrupt(CPU::Interrupt::VBLANK);
@@ -168,6 +170,8 @@ void PPU::HandleModeVBLANK()
 
         if (lcd->ly >= 154)
         {
+            windowLineCounter = 0;
+
             lcd->ly = 0;
             SwitchMode(OAMSCAN);
             windowTriggered = false;
@@ -181,12 +185,9 @@ void PPU::HandleModeVBLANK()
 
 void PPU::HandleModeDrawPixels()
 {
-
     if (dots % 10 == 0)
     {
         FetchBackGroundPixels();
-
-
     }
 
     FetchSpritePixels();
@@ -282,11 +283,14 @@ void PPU::FetchWindowPixels()
     uint16_t tileIndexAddress = lcd->GetControlBit(LCD::Control::WINDOW_TILEMAP) ? 0x9C00 : 0x9800;
 
     uint16_t fetcherX = ((fetchedX) - (lcd->windowX - 7) / 8) & 0x1F;
-    uint16_t fetcherY = (lcd->ly - lcd->windowY);
+    uint16_t fetcherY = (windowLineCounter);
+   
+   
     tileIndexAddress += 32 * (fetcherY / 8) + fetcherX;
     uint8_t tileIndex = emu->read(tileIndexAddress);
 
     tileAddress = lcd->GetControlBit(LCD::Control::BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+    tileY = ((windowLineCounter) % 8) * 2;
 
 }
 
@@ -305,6 +309,9 @@ void PPU::FetchBackGroundPixels()
         uint8_t tileIndex = emu->read(tileIndexAddress);
         tileAddress = lcd->GetControlBit(LCD::Control::BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
 
+        tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
+
+
         if (WindowVisible())
             FetchWindowPixels();
 
@@ -313,14 +320,11 @@ void PPU::FetchBackGroundPixels()
 
     fetchedX++;
 
-    uint8_t tileY = ((lcd->ly + lcd->scrollY) % 8) * 2;
-    tileLo = emu->read(tileAddress + tileY);
-    tileHi = emu->read(tileAddress + tileY + 1);
+    uint8_t tileLo = emu->read(tileAddress + tileY);
+    uint8_t tileHi = emu->read(tileAddress + tileY + 1);
 
 
 
-    if (background_pixels.size() < 8)
-    {
 
         for (int i = 7; i >= 0; i--)
         {
@@ -332,11 +336,11 @@ void PPU::FetchBackGroundPixels()
             if (!lcd->GetControlBit(LCD::Control::BG_WINDOW_ENABLE))
                 col = 0;
 
-            background_pixels.emplace(lcd->GetColor(col, lcd->bgp));
+               background_pixels.emplace(lcd->GetColor(col, lcd->bgp));
 
 
         }
-    }
+
 
 
 }
@@ -360,15 +364,19 @@ void PPU::PixelRender()
     }
   
     int index = lcd->ly * RESX + pushedX;
-
-    if (WindowVisible() && !(lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 14))
+    
+    static int prevWindowY = (int)lcd->windowY;
+    if (lcd->windowY != prevWindowY)
     {
-        if (scanlineX >= lcd->windowX % 8 || lcd->ly >= lcd->windowY % 8) // this needs to check window x and window y for smooth window scrolling
+        std::println("{}", (int)lcd->windowY);
+        prevWindowY = lcd->windowY;
+    }
+  
+    if (WindowVisible() && !(lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 7))
+    {
+        if (scanlineX >= (lcd->windowX - 7) % 8) // this needs to check window x and window y for smooth window scrolling
         {
-
-            uint32_t defaultColors[4] = { 0xFFFFFFFF, 0xA9A9A9FF, 0x545454FF, 0x00000000 };
-
-            videoBuffer[index] = defaultColors[color];
+            videoBuffer[index] = DEFAULT_COLORS[color];
             pushedX++;
         }
 
@@ -378,9 +386,7 @@ void PPU::PixelRender()
         if (scanlineX >= lcd->scrollX % 8) // this needs to check window x and window y for smooth window scrolling
         {
 
-            uint32_t defaultColors[4] = { 0xFFFFFFFF, 0xA9A9A9FF, 0x545454FF, 0x00000000 };
-
-            videoBuffer[index] = defaultColors[color];
+            videoBuffer[index] = DEFAULT_COLORS[color];
             pushedX++;
         }
 
@@ -394,6 +400,7 @@ void PPU::PixelRender()
 
 void PPU::OAM_write(uint16_t address, uint8_t data)
 {
+
     if(address >= 0xFE00) address -= 0xFE00;
 
     uint8_t* oam_bytes = (uint8_t*)oam_ram;
@@ -403,7 +410,7 @@ void PPU::OAM_write(uint16_t address, uint8_t data)
 
 uint8_t PPU::OAM_read(uint16_t address)
 {
-
+ 
     if(address >= 0xFE00) address -= 0xFE00;
 
 
@@ -537,8 +544,11 @@ void LCD::SetStatusBit(const LCD::Status statusType, uint8_t set)
 void PPU::IncrementLY()
 {
     lcd->ly++;
- 
-    if (WindowVisible() && lcd->ly > lcd->windowY)
+    
+    if (WindowVisible() && (lcd->ly == lcd->windowY))
+        windowLineCounter = 0;
+
+    if (WindowVisible() && lcd->ly > lcd->windowY && lcd->ly < lcd->windowY + RESY)
         windowLineCounter++;
 
     if (lcd->ly == lcd->lyc)

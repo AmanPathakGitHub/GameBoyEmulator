@@ -11,10 +11,10 @@ Cartridge::Cartridge(const std::string& filename)
 
 	// 0x4F, is the size of the header
 	ifs.seekg(0x100);
-	ifs.read((char*)&header, 0x4F);
+	ifs.read((char*)&m_Header, 0x4F);
 
 
-	m_ROM_size = 32768 * (1 << header.romSize);
+	m_ROM_size = 32768 * (1 << m_Header.romSize);
 	
 	m_CartData = (uint8_t*)malloc(m_ROM_size);
 
@@ -24,7 +24,7 @@ Cartridge::Cartridge(const std::string& filename)
 	ifs.close();
 
 
-	memoryBankController = CreateMBCByType(header, m_CartData);
+	m_MemoryBankController = CreateMBCByType(m_Header, m_CartData);
 
 	std::cout << "ROM SIZE: " << (int)m_ROM_size << std::endl;
 }
@@ -33,10 +33,10 @@ Cartridge::Cartridge(const std::string& filename)
 
 uint8_t Cartridge::ReadCart(uint16_t address)
 {
-	return memoryBankController->read(address);
+	return m_MemoryBankController->read(address);
 }
 
 void Cartridge::WriteCart(uint16_t address, uint8_t data)
 {
-	memoryBankController->write(address, data);
+	m_MemoryBankController->write(address, data);
 }

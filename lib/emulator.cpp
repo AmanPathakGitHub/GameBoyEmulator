@@ -25,15 +25,9 @@ void Emulator::Reset()
 	ppu.Reset();
 	timer.Reset();
 
-	for (int i = 0; i < memory.size(); i++)
-		memory[i] = 0x00;
-
-	for (int i = 0; i < wram.size(); i++)
-		wram[i] = 0x00;
-
-	for (int i = 0; i < hram.size(); i++)
-		hram[i] = 0x00;
-
+	memory.fill(0);
+	wram.fill(0);
+	hram.fill(0);
 
 	serial_data[0] = 0;
 	serial_data[1] = 0;
@@ -266,8 +260,6 @@ void Emulator::write(uint16_t address, uint8_t data)
 
 uint16_t Emulator::read16(uint16_t address)
 {
-	// TODO handle endianess
-
 	uint8_t lo = read(address);
 	uint8_t hi = read(address + 1);
 

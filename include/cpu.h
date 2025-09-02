@@ -4,7 +4,6 @@
 #include <functional>
 #include <string>
 #include <variant>
-#include <cstdint>
 #include <fstream>
 #include <array>
 
@@ -23,15 +22,7 @@ public:
 
 	void Reset();
 	void Clock();
-	
 
-
-	bool halted = false;
-	bool int_master_enabled = false;
-	bool ime_enabling = false;
-
-	uint8_t int_enable = 0;
-	uint8_t int_flag = 0;
 
 	enum Interrupt
 	{
@@ -78,28 +69,15 @@ public:
 	
 	enum class CondType {
 		NONE,
-		Z,
-		NZ,
-		C,
-		NC
+		Z, NZ,
+		C, NC
 	};
 
 	 enum class RegType {
 		NONE,
-		A,
-		B,
-		C,
-		D,
-		E,
-		H,
-		L,
-		AF,
-		BC,
-		DE,
-		HL,
-		SP,
-		HLI,
-		HLD
+		A, B, C, D, E, H, L,
+		AF, BC, DE, HL, SP,
+		HLI, HLD
 	};
 
 
@@ -130,6 +108,14 @@ public:
 	uint16_t PC;
 	uint16_t SP;
 
+
+	bool halted = false;
+	bool int_master_enabled = false;
+	bool ime_enabling = false;
+
+	uint8_t int_enable = 0;
+	uint8_t int_flag = 0;
+
 	Instruction InstructionByOpcode(uint8_t opcode);
 	uint8_t m_Cycles = 0;
 
@@ -148,6 +134,8 @@ private:
 
 	std::array<Instruction, 256> m_JumpTable;
 	std::array<Instruction, 256> m_CBPrefixJumpTable;
+
+
 
 
 	void cpu_push(uint8_t byte);
@@ -243,5 +231,5 @@ private:
 
 };
 
-std::string_view CondTypeToString(const CPU::CondType& cond);
-std::string_view RegTypeToString(const CPU::RegType& reg);
+std::string_view CondTypeToString(const CPU::CondType cond);
+std::string_view RegTypeToString(const CPU::RegType reg);
