@@ -43,8 +43,6 @@ void PPU::Reset()
     scanlineX = 0; // this is the x position in the scanline, used for pixel drawing
     pushedX = 0;
 
-    //windowLineCounter = 0;
-
 }
 
 void PPU::tick()

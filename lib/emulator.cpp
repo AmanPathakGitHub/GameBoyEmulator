@@ -24,6 +24,7 @@ void Emulator::Reset()
 	lcd.Reset();
 	ppu.Reset();
 	timer.Reset();
+	dma.Reset();
 
 	memory.fill(0);
 	wram.fill(0);

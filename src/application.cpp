@@ -147,6 +147,24 @@ void Application::ImGuiDraw()
 			ImGui::EndMenu();
 		}
 
+		if (ImGui::BeginMenu("Emulation"))
+		{
+			if (ImGui::MenuItem(emu_run ? "Pause" : "Continue"))
+				emu_run = !emu_run;
+			if (ImGui::BeginMenu("Speed"))
+			{
+				if (ImGui::MenuItem("100%")) SetTargetFPS(60);
+				if (ImGui::MenuItem("200%")) SetTargetFPS(60 * 2);
+				if (ImGui::MenuItem("300%")) SetTargetFPS(60 * 3);
+				if (ImGui::MenuItem("400%")) SetTargetFPS(60 * 4);
+				if (ImGui::MenuItem("Max Speed")) SetTargetFPS(-1);
+				
+				ImGui::EndMenu();
+			}
+
+			ImGui::EndMenu();
+		}
+
 		ImGui::EndMainMenuBar();
 	}
 	

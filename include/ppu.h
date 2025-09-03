@@ -37,6 +37,7 @@ class Emulator;
 class DMA
 {
 public:
+    void Reset() { currentAddress = 0; transferring = false; }
     void ConnectToEmulator(Emulator* emu);
     void StartTransfer(uint8_t value);
     void Tick();

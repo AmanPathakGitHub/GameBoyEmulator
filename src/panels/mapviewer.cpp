@@ -33,8 +33,8 @@ void MapViewer::Update()
 	}
 
 
-	ImGui::RadioButton("Tile Map 1", &startAddress, 0x8000); ImGui::SameLine();
-	ImGui::RadioButton("Tile Map 2", &startAddress, 0x9000);
+	ImGui::RadioButton("Tile Map 1", &startAddress, 0x9800); ImGui::SameLine();
+	ImGui::RadioButton("Tile Map 2", &startAddress, 0x9C00);
 
 	UpdatePixelBuffer(startAddress);
 	UpdateTexture(m_RenderTexture.texture, m_PixelBuffer.data());
@@ -50,13 +50,15 @@ void MapViewer::UpdatePixelBuffer(uint16_t startLocation)
 		for (int x = 0; x < 32; x++)
 		{
 			uint16_t index = y * 32 + x;
-			uint16_t address = 0x9C00 + index;
+			uint16_t address = startLocation + index;
 			uint8_t tileIndex = m_Emulator.read(address);
 
 			for (int lineY = 0; lineY < 16; lineY += 2)
 			{
-				uint8_t lo = m_Emulator.read(startLocation + (tileIndex * 16) + lineY);
-				uint8_t hi = m_Emulator.read(startLocation + (tileIndex * 16) + lineY + 1);
+				uint16_t tileAddress = m_Emulator.lcd.GetControlBit(LCD::Control::BG_WINDOW_TILES) ? 0x8000 + tileIndex * 16 : 0x9000 + (int8_t)tileIndex * 16;
+
+				uint8_t lo = m_Emulator.read(tileAddress + lineY);
+				uint8_t hi = m_Emulator.read(tileAddress + lineY + 1);
 
 				for (int8_t bit = 7; bit >= 0; bit--)
 				{

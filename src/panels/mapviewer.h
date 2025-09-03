@@ -22,7 +22,7 @@ private:
 	RenderTexture2D m_RenderTexture;
 	std::array<uint32_t, MAPVIEWER_WIDTH * MAPVIEWER_HEIGHT> m_PixelBuffer;
 
-	int startAddress = 0x8000;
+	int startAddress = 0x9C00;
 
 	void UpdatePixelBuffer(uint16_t startLocation);
 };
