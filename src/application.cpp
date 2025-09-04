@@ -9,6 +9,7 @@
 #include <rlImGui.h>
 #include <imgui_impl_raylib.h>
 #include <print>
+#include <filesystem>
 
 #include "platformUtils.h"
 #include "panels/memoryview.h"
@@ -40,6 +41,8 @@ Application::Application(const ApplicationSettings settings)
 
 	m_Panels.reserve(4); // total of 4 maximum panels
 
+	startupPath = std::filesystem::current_path();
+
 
 
 	ImGui::CreateContext();
@@ -51,6 +54,9 @@ Application::Application(const ApplicationSettings settings)
 
 	io.ConfigViewportsNoAutoMerge = false;  // Allow separate viewports to merge
 	io.ConfigViewportsNoTaskBarIcon = false;  // Show floating ImGui windows in the taskbar
+
+	static std::string iniPath = (startupPath / "imgui.ini").string(); // Pointer would be dangling if it was not static
+	io.IniFilename = iniPath.c_str();
 
 	ImGui::StyleColorsClassic();
 
@@ -67,6 +73,8 @@ Application::Application(const ApplicationSettings settings)
 
 Application::~Application()
 {
+
+	std::filesystem::current_path(startupPath);
 
 	ImGui_ImplRaylib_Shutdown();
 	ImGui::DestroyContext();
@@ -277,10 +285,15 @@ void Application::Run()
 		UpdateTexture(renderTexture.texture, GetVideoBuffer().data());
 
 		BeginTextureMode(renderTexture);
+		
+		if (!emu.romLoaded)
+			DrawText("No rom loaded", RESX / 2 - (14 * 5 / 2), RESY / 2 - 5, 10, WHITE);
 
-		if(m_ShowFPS)
-			DrawText(std::format("{}", GetFPS()).c_str(), 120, 0, 10, GREEN);
-
+		if (!emu_run && emu.romLoaded)
+			DrawText("Paused", 1, 1, 10, RED);
+		if (m_ShowFPS)
+			DrawText(std::format("{}", GetFPS()).c_str(), 10, 130, 10, GREEN);
+		
 
  		EndTextureMode();
 

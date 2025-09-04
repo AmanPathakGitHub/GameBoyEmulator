@@ -4,6 +4,7 @@
 #include "panels/panel.h"
 
 #include <fstream>
+#include <filesystem>
 
 #include <raylib.h>
 
@@ -41,6 +42,8 @@ private:
 
 	std::vector<std::unique_ptr<Panel>> m_Panels;
 	bool m_ShowFPS = false;
+
+	std::filesystem::path startupPath; // used to make sure imgui.ini file is saved the correct location
 
 
 	template<PanelType T>

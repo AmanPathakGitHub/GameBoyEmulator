@@ -1,14 +1,6 @@
 
-// This file is to seperate platorm specific code (so far only the dialog box)
-// also raylib and the win32 api (windows.h and raylib.h) have naming conflicts so they can't be included in the same file
-
-
-#define GLFW_EXPOSE_NATIVE_WIN32
-
 #include <windows.h>
 #include <commdlg.h>
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 
 #include "platformUtils.h"
 

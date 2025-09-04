@@ -54,6 +54,4 @@ void TileViewer::UpdatePixelBuffer()
 		}
 	}
 
-	printf("%d\n", tileNum);
-
 }

@@ -52,7 +52,12 @@ MBC1::MBC1(uint8_t* cartData, const CartridgeHeader& header)
 
 	title = header.title;
 
-	std::fstream fs(title + ".sav");
+
+	requiresSave = header.cartridgeType != 1;
+
+	std::fstream fs;
+
+	if (requiresSave) fs.open(title + ".sav");
 
 	if (fs.is_open())
 	{
@@ -124,19 +129,122 @@ void MBC1::write(uint16_t address, uint8_t data)
 			int effectiveAddress = (address - 0xA000) + ramBank * 0x2000;
 
 			externalRAM[effectiveAddress] = data;
+			save();
 		}
 	}
 }
 
 void MBC1::save()
 {
+	if (!requiresSave) return;
+
 	std::ofstream fs(title + ".sav", std::ios::binary);
 
-	if (!fs.is_open()) throw std::runtime_error("File could not be open");
+	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
 
 	std::cout << externalRAMSize << std::endl;
 
 	fs.write((char*)externalRAM, externalRAMSize);
+
+	fs.close();
+}
+
+
+MBC2::MBC2(uint8_t* cartData, const CartridgeHeader& header)
+	: MBC(cartData), ram({})
+{
+	requiresSave = header.cartridgeType == 6;
+	title = header.title;
+
+
+	std::fstream fs;
+
+	if (requiresSave) fs.open(title + ".sav");
+
+	if (fs.is_open())
+	{
+		fs.read((char*)ram.data(), ram.size());
+	}
+	else
+		ram.fill(0);
+
+}
+
+MBC2::~MBC2()
+{
+	save();
+}
+
+uint8_t MBC2::read(uint16_t address)
+{
+	if (address < 0x4000)
+		return cartData[address];
+	else if (address < 0x8000)
+	{
+		int effectiveAddress = (address - 0x4000) + romBankNumber * 0x4000;
+		assert(effectiveAddress < 262144);
+		return cartData[effectiveAddress];
+	}
+
+	//////////////////////
+	else if (address >= 0xA000 && address < 0xA200)
+	{
+		if (!ramEnabled) return 0xBB;
+		return (ram[address - 0xA000] & 0xF) | 0xF0;
+	}
+	else if (address >= 0xA200 && address < 0xC000)
+	{
+		if (!ramEnabled) return 0xBB;
+		return (ram[address & 0x1FF] & 0xF) | 0xF0; // lower 9 bits only
+	}
+	//////////////////////////
+	__debugbreak();
+}
+
+
+void MBC2::write(uint16_t address, uint8_t data)
+{
+
+	if (address < 0x4000)
+	{
+		bool isBitSet = address & 0x100; // bit 8 of the address
+
+		if (isBitSet == 0)
+		{
+			ramEnabled = (data & 0xF) == 0xA;
+		}
+		else
+		{
+			romBankNumber = data & 0xF;
+			if (romBankNumber == 0) romBankNumber = 1;
+		}
+	}
+
+	else if (address >= 0xA000 && address < 0xA200)
+	{
+		if (!ramEnabled) return;
+		int effectiveAddress = address - 0xA000;
+		ram[effectiveAddress] = data;
+		save();
+	}
+	else if (address >= 0xA200 && address < 0xC000)
+	{
+		if (!ramEnabled) return;
+		ram[address & 0x1FF] = data & 0xF;
+		save();
+	}
+
+}
+
+void MBC2::save()
+{
+	if (!requiresSave) return;
+
+	std::ofstream fs(title + ".sav", std::ios::binary);
+
+	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
+
+	fs.write((char*)ram.data(), ram.size());
 
 	fs.close();
 }
@@ -151,6 +259,8 @@ std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* car
 	case 1: return std::make_unique<MBC1>(cartData, header);
 	case 2: return std::make_unique<MBC1>(cartData, header);
 	case 3: return std::make_unique<MBC1>(cartData, header);
+	case 5: return std::make_unique<MBC2>(cartData, header);
+	case 6: return std::make_unique<MBC2>(cartData, header);
 	default: throw std::runtime_error("ROM TYPE NOT SUPPORTED");
 	}
 }

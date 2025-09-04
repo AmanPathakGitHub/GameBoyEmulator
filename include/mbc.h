@@ -42,6 +42,8 @@ private:
 
 	void save();
 
+	uint8_t* externalRAM;
+
 	bool ramEnabled = false;
 	uint8_t romBankNumber = 1;
 	uint8_t ramBankNumber = 0;
@@ -52,7 +54,31 @@ private:
 
 	std::string title; // file name to save and read from
 	
-	uint8_t* externalRAM;
+	bool requiresSave;
+};
+
+class MBC2 : public MBC
+{
+public:
+	MBC2(uint8_t* cartData, const CartridgeHeader& header);
+	~MBC2();
+	
+
+	uint8_t read(uint16_t address) override;
+	void write(uint16_t address, uint8_t data) override;
+
+private:
+	int romBankNumber = 1;
+
+	std::array<uint8_t, 512> ram;
+	bool requiresSave;
+
+	bool ramEnabled = false;
+
+	std::string title;
+
+	void save();
+
 };
 
 std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* cartData);

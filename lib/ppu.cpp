@@ -363,12 +363,6 @@ void PPU::PixelRender()
   
     int index = lcd->ly * RESX + pushedX;
     
-    static int prevWindowY = (int)lcd->windowY;
-    if (lcd->windowY != prevWindowY)
-    {
-        std::println("{}", (int)lcd->windowY);
-        prevWindowY = lcd->windowY;
-    }
   
     if (WindowVisible() && !(lcd->ly < lcd->windowY || scanlineX < lcd->windowX - 7))
     {
