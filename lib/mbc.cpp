@@ -1,4 +1,4 @@
-#include "mbc.h"
+﻿#include "mbc.h"
 #include "cartridge.h"
 
 #include <cassert>
@@ -6,8 +6,22 @@
 #include <cstring>
 #include <iostream>
 #include <expected>
-
+#include <chrono>
 #include <fstream>
+
+
+static uint32_t GetRAMSize(uint8_t ramByte)
+{
+	switch (ramByte)
+	{
+	case 0: return 0;
+	case 2: return 8 * 1024;
+	case 3: return 32 * 1024;
+	case 4: return 128 * 1024;
+	case 5: return 64 * 1024;
+	}
+}
+
 
 MBC::MBC(uint8_t* cartData)
 {
@@ -186,7 +200,6 @@ uint8_t MBC2::read(uint16_t address)
 		return cartData[effectiveAddress];
 	}
 
-	//////////////////////
 	else if (address >= 0xA000 && address < 0xA200)
 	{
 		if (!ramEnabled) return 0xBB;
@@ -197,7 +210,6 @@ uint8_t MBC2::read(uint16_t address)
 		if (!ramEnabled) return 0xBB;
 		return (ram[address & 0x1FF] & 0xF) | 0xF0; // lower 9 bits only
 	}
-	//////////////////////////
 	__debugbreak();
 }
 
@@ -250,6 +262,172 @@ void MBC2::save()
 }
 
 
+void RTC::SetActive(uint8_t reg)
+{
+	switch (reg)
+	{
+	case 0x08: active = &S; break;
+	case 0x09: active = &M; break;
+	case 0x0A: active = &H; break;
+	case 0x0B: active = &DL; break;
+	case 0x0C: active = &DH; break;
+	//default: active = nullptr;
+	}
+}
+
+void RTC::WriteActive(uint8_t data)
+{
+	if (IsHalted()) return;
+	*active = data;
+}
+
+uint8_t RTC::GetActive()
+{
+	return *active;
+}
+
+void RTC::LatchRegisters(uint8_t data)
+{
+	if (latchRegister == 0 && data == 1)
+	{
+		using namespace std::chrono;
+		auto currentTime = std::chrono::system_clock::now();
+
+		S = time_point_cast<seconds>(currentTime).time_since_epoch().count() % 60;
+		M = time_point_cast<minutes>(currentTime).time_since_epoch().count() % 60;
+		H = time_point_cast<hours>(currentTime).time_since_epoch().count() % 24;
+
+		uint16_t dayCounter = time_point_cast<days>(currentTime).time_since_epoch().count() % 512;
+
+		DL = dayCounter & 0xFF;
+		uint8_t dhUpperBit = !!(dayCounter & (1 << 8));
+		
+		if (dhUpperBit) DH |= 1;
+		else DH &= ~(1);
+
+		if (dayCounter == 0) // wrapped from 511 -> 0
+			DH |= (1 << 7);
+	}
+
+	latchRegister = data;
+	
+}
+
+bool RTC::IsHalted()
+{
+	return !!(DH & (1 << 6));
+}
+
+uint8_t RTC::GetDayCounterCarry()
+{
+	return DH & (1 << 7);
+}
+
+
+MBC3::MBC3(uint8_t* cartData, const CartridgeHeader header, bool requiresSave = false)
+	: MBC(cartData), requiresSave(requiresSave)
+{
+	ramSize = GetRAMSize(header.ramSize);
+	ram = new uint8_t[ramSize];
+
+	title = header.title;
+
+	std::fstream fs;
+
+	if (requiresSave) fs.open(title + ".sav");
+
+	if (fs.is_open())
+		fs.read((char*)ram, ramSize);
+	else
+		memset(ram, 0, ramSize);
+}
+
+MBC3::~MBC3()
+{
+	save();
+	delete[] ram;
+}
+
+void MBC3::save()
+{
+	if (!requiresSave) return;
+
+	std::ofstream fs(title + ".sav", std::ios::binary);
+
+	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
+
+	fs.write((char*)ram, ramSize);
+
+	fs.close();
+}
+
+
+uint8_t MBC3::read(uint16_t address)
+{
+	if (address < 0x4000)
+		return cartData[address];
+	else if (address < 0x8000)
+	{
+		int effectiveAddress = (address - 0x4000) + romBankNumber * 0x4000;
+		return cartData[effectiveAddress];
+	}
+	else if (address >= 0xA000 && address <= 0xBFFF)
+	{
+		if (!ramAndTimerEnable) return 0xFF;
+
+		if (registerSelect < 8)
+		{
+			int effectiveAddress = (address - 0xA000) + ramBankNumber * 0x2000;
+			return ram[effectiveAddress];
+		}
+
+		return rtc.GetActive();
+	}
+
+	return 0xFF;
+}
+
+void MBC3::write(uint16_t address, uint8_t data)
+{
+	if (address < 0x2000)
+		ramAndTimerEnable = (data & 0xF) == 0xA;
+	else if (address < 0x4000)
+	{
+		romBankNumber = data & 0x7F;
+		if (romBankNumber == 0) romBankNumber = 1;
+	}
+	else if (address < 0x6000)
+	{
+		registerSelect = data & 0xF;
+		if (registerSelect < 8)
+		{
+			ramBankNumber = data & 0xF;
+			return;
+		}
+
+		rtc.SetActive(registerSelect);
+		
+	}
+	else if (address < 0x8000)
+	{
+		rtc.LatchRegisters(data);
+	}
+	else if (address >= 0xA000 && address <= 0xC000)
+	{
+		if (!ramAndTimerEnable) return;
+
+		if (registerSelect < 8)
+		{
+			int effectiveAddress = (address - 0xA000) + ramBankNumber * 0x2000;
+			ram[effectiveAddress] = data;
+			//save();
+			return;
+		}
+
+		rtc.WriteActive(data);
+	}
+}
+
 std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* cartData)
 {
 	std::cout << "Cart Type: " << (int)header.cartridgeType << std::endl;
@@ -261,6 +439,11 @@ std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* car
 	case 3: return std::make_unique<MBC1>(cartData, header);
 	case 5: return std::make_unique<MBC2>(cartData, header);
 	case 6: return std::make_unique<MBC2>(cartData, header);
+	case 0xF: return std::make_unique<MBC3>(cartData, header, true);
+	case 0x10: return std::make_unique<MBC3>(cartData, header, true);
+	case 0x11: return std::make_unique<MBC3>(cartData, header);
+	case 0x12: return std::make_unique<MBC3>(cartData, header);
+	case 0x13: return std::make_unique<MBC3>(cartData, header, true);
 	default: throw std::runtime_error("ROM TYPE NOT SUPPORTED");
 	}
 }

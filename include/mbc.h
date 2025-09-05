@@ -81,4 +81,64 @@ private:
 
 };
 
+// Real Time Clock (realised all only gameboy color games uses this which this emualtor does not support)
+// basically this struct is useless
+// keeping it here in case i want to ever make this a gameboy color emulator
+struct RTC
+{
+
+	RTC() = default;
+
+	uint8_t S;
+	uint8_t M;
+	uint8_t H;
+	uint8_t DL;
+	uint8_t DH;
+	
+	uint8_t latchRegister;
+
+	void SetActive(uint8_t reg);
+	void WriteActive(uint8_t data);
+	uint8_t GetActive();
+	void LatchRegisters(uint8_t data);
+	bool IsHalted();
+	uint8_t GetDayCounterCarry();
+	
+private:
+	// shouldnt be able to set the pointer to whatever
+	uint8_t* active = nullptr;
+
+};
+
+class MBC3 : public MBC
+{
+public:
+	MBC3(uint8_t* cartData, const CartridgeHeader header, bool requiresSave);
+	~MBC3();
+
+
+	uint8_t read(uint16_t address) override;
+	void write(uint16_t address, uint8_t data) override;
+
+
+private:
+
+	uint8_t romBankNumber = 1;
+	uint8_t ramBankNumber = 1;
+
+	uint8_t registerSelect = 0;
+
+	bool ramAndTimerEnable = false;
+
+	uint8_t* ram;
+	RTC rtc;
+
+	bool requiresSave;
+	std::string title;
+	uint32_t ramSize;
+
+	void save();
+
+};
+
 std::unique_ptr<MBC> CreateMBCByType(const CartridgeHeader& header, uint8_t* cartData);
