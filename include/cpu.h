@@ -125,15 +125,17 @@ public:
 	bool CheckInterrupt(Interrupt interupt_type, uint16_t address);
 	void RequestInterrupt(Interrupt interrupt_type);
 
+	Instruction HandleCBInstruction(uint8_t opcode);
+	std::array<Instruction, 256> m_JumpTable;
+	std::array<Instruction, 256> m_CBPrefixJumpTable;
+
+
 private:
 	Emulator* emu;
 	
 	std::ofstream debug_file;
 
-	Instruction HandleCBInstruction(uint8_t opcode);
 
-	std::array<Instruction, 256> m_JumpTable;
-	std::array<Instruction, 256> m_CBPrefixJumpTable;
 
 
 

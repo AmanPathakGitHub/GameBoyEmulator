@@ -110,6 +110,9 @@ void Application::ImGuiDraw()
 
 	ImGui::Image((ImTextureID)renderTexture.texture.id, scaledSize, ImVec2(0, 1), ImVec2(1, 0));
 
+	if (ImGui::IsWindowFocused())
+		HandleInput();
+
 	ImGui::End();
 
 
@@ -197,6 +200,10 @@ std::array<uint32_t, RESX * RESY> Application::GetVideoBuffer()
 void Application::HandleInput()
 {
 	// INPUT
+
+	ImGuiIO& io = ImGui::GetIO();
+
+
 	if (IsKeyPressed(KEY_UP))
 		emu.buttonState.up = true;
 	if (IsKeyPressed(KEY_DOWN))
@@ -249,7 +256,6 @@ void Application::Run()
 		// Start the Dear ImGui frame
 		ImGui_ImplRaylib_NewFrame();
 		ImGui::NewFrame();
-		ImGui::ShowDemoWindow();
 
 		ImGui::DockSpaceOverViewport();
 
@@ -277,7 +283,6 @@ void Application::Run()
 				emu.clock();
 		}
 
-		HandleInput();
 
 		if (emu_run && emu.romLoaded) emu.UpdateFrame();
 		ImGuiDraw();

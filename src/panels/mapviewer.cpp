@@ -39,7 +39,16 @@ void MapViewer::Update()
 	UpdatePixelBuffer(startAddress);
 	UpdateTexture(m_RenderTexture.texture, m_PixelBuffer.data());
 
-	ImGui::Image(m_RenderTexture.texture.id, { MAPVIEWER_WIDTH * SCALE, MAPVIEWER_HEIGHT * SCALE });
+
+	ImVec2 windowSize = ImGui::GetContentRegionAvail();
+
+	float scale = std::min(windowSize.x / m_RenderTexture.texture.width, windowSize.y / m_RenderTexture.texture.height);
+
+	ImVec2 scaledSize = ImVec2(m_RenderTexture.texture.width * scale, m_RenderTexture.texture.height * scale);
+
+	ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + (windowSize.x - scaledSize.x) / 2, ImGui::GetCursorPosY() + (windowSize.y - scaledSize.y) / 2));
+
+	ImGui::Image(m_RenderTexture.texture.id, scaledSize);
 }
 
 void MapViewer::UpdatePixelBuffer(uint16_t startLocation)

@@ -1106,7 +1106,8 @@ CPU::Instruction CPU::InstructionByOpcode(uint8_t opcode)
 	case 0xF9:
 		return {"LD", 2, &CPU::LD, {REG16, RegType::SP}, {REG16, RegType::HL}};
 	case 0xCB:
-		std::runtime_error("0xCB instruction, needs to be handled externally, ie. use HandleCBInstruction");
+		//throw std::runtime_error("0xCB instruction, needs to be handled externally, ie. use HandleCBInstruction");
+
 	
 
 	default:

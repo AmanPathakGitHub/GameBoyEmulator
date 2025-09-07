@@ -23,7 +23,15 @@ void TileViewer::Update()
 	UpdatePixelBuffer();
 	UpdateTexture(m_Texture.texture, m_PixelBuffer.data());
 
-	ImGui::Image(m_Texture.texture.id, { TILEVIEWER_WIDTH * SCALE, TILEVIEWER_HEIGHT * SCALE });
+	ImVec2 windowSize = ImGui::GetContentRegionAvail();
+
+	float scale = std::min(windowSize.x / m_Texture.texture.width, windowSize.y / m_Texture.texture.height);
+
+	ImVec2 scaledSize = ImVec2(m_Texture.texture.width * scale, m_Texture.texture.height * scale);
+
+	ImGui::SetCursorPos(ImVec2(ImGui::GetCursorPosX() + (windowSize.x - scaledSize.x) / 2, ImGui::GetCursorPosY() + (windowSize.y - scaledSize.y) / 2));
+
+	ImGui::Image(m_Texture.texture.id, scaledSize);
 
 }
 

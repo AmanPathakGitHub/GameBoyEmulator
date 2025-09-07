@@ -31,7 +31,15 @@ std::vector<std::string> Disassembler::disassemble(Emulator& emu, uint16_t start
 	for (uint16_t currentAddress = startAddress; currentAddress <= endAddress;)
 	{
 		uint8_t opcode = emu.read(currentAddress++);
-		CPU::Instruction currentInstruction = emu.cpu.InstructionByOpcode(opcode);
+		CPU::Instruction currentInstruction;
+		if (opcode == 0xCB)
+		{
+			opcode = emu.read(currentAddress++);
+			currentInstruction = emu.cpu.m_CBPrefixJumpTable[opcode];
+
+		}
+		else
+			currentInstruction = emu.cpu.InstructionByOpcode(opcode);
 
 		std::stringstream ss;
 

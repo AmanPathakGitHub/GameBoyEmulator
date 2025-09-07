@@ -46,9 +46,7 @@ uint8_t MBC0::read(uint16_t address)
 
 void MBC0::write(uint16_t address, uint8_t data)
 {
-	if (address < 0x8000)
-		cartData[address] = data;
-	else
+	if (address >= 0xA000)
 		externalRam[address - 0xA000] = data;
 }
 

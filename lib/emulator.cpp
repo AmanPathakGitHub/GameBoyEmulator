@@ -228,6 +228,7 @@ void Emulator::write(uint16_t address, uint8_t data)
     } else if (address < 0xC000) {
         //EXT-RAM
         cartridge->WriteCart(address, data);
+		return;
     } else if (address < 0xE000) {
         //WRAM
         wram[address - 0xC000] = data;
