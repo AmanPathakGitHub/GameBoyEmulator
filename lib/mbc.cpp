@@ -9,6 +9,8 @@
 #include <chrono>
 #include <fstream>
 
+#include <filesystem>
+
 
 static uint32_t GetRAMSize(uint8_t ramByte)
 {
@@ -69,16 +71,21 @@ MBC1::MBC1(uint8_t* cartData, const CartridgeHeader& header)
 
 	requiresSave = header.cartridgeType != 1;
 
-	std::fstream fs;
 
-	if (requiresSave) fs.open(title + ".sav");
+	std::string fileName = title + ".sav";
 
-	if (fs.is_open())
+	if (std::filesystem::exists(fileName))
 	{
-		fs.read((char*)externalRAM, ramSize);
+		std::ifstream ifs(fileName);
+
+		ifs.read((char*)externalRAM, ramSize);
 	}
-	else 
-		memset(externalRAM, 0, ramSize);
+	else
+		memset((char*)externalRAM, 0, ramSize);
+
+
+	if (requiresSave)
+		ofs.open(fileName);
 
 
 	cartDataSize = 32768 * (1 << header.romSize);
@@ -152,15 +159,11 @@ void MBC1::save()
 {
 	if (!requiresSave) return;
 
-	std::ofstream fs(title + ".sav", std::ios::binary);
 
-	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
+	if (!ofs.is_open()) throw std::runtime_error("Save file could not be open");
 
-	std::cout << externalRAMSize << std::endl;
+	ofs.write((char*)externalRAM, externalRAMSize);
 
-	fs.write((char*)externalRAM, externalRAMSize);
-
-	fs.close();
 }
 
 
@@ -171,16 +174,22 @@ MBC2::MBC2(uint8_t* cartData, const CartridgeHeader& header)
 	title = header.title;
 
 
-	std::fstream fs;
 
-	if (requiresSave) fs.open(title + ".sav");
+	std::string fileName = title + ".sav";
 
-	if (fs.is_open())
+	if (std::filesystem::exists(fileName))
 	{
-		fs.read((char*)ram.data(), ram.size());
+		std::ifstream ifs(fileName);
+
+		ifs.read((char*)ram.data(), ram.size());
 	}
 	else
-		ram.fill(0);
+		memset((char*)ram.data(), 0, ram.size());
+
+
+	if (requiresSave)
+		ofs.open(fileName);
+
 
 }
 
@@ -252,13 +261,10 @@ void MBC2::save()
 {
 	if (!requiresSave) return;
 
-	std::ofstream fs(title + ".sav", std::ios::binary);
+	if (!ofs.is_open()) throw std::runtime_error("Save file could not be open");
 
-	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
+	ofs.write((char*)ram.data(), ram.size());
 
-	fs.write((char*)ram.data(), ram.size());
-
-	fs.close();
 }
 
 
@@ -331,15 +337,24 @@ MBC3::MBC3(uint8_t* cartData, const CartridgeHeader header, bool requiresSave = 
 	ram = new uint8_t[ramSize];
 
 	title = header.title;
+	
+	std::string fileName = title + ".sav";
 
-	std::fstream fs;
 
-	if (requiresSave) fs.open(title + ".sav");
+	if (std::filesystem::exists(fileName))
+	{
+		std::ifstream ifs(fileName);
 
-	if (fs.is_open())
-		fs.read((char*)ram, ramSize);
+		ifs.read((char*)ram, ramSize);
+	}
 	else
-		memset(ram, 0, ramSize);
+		memset((char*)ram, 0, ramSize);
+
+
+	if (requiresSave)
+		ofs.open(fileName);
+
+		
 }
 
 MBC3::~MBC3()
@@ -350,15 +365,14 @@ MBC3::~MBC3()
 
 void MBC3::save()
 {
+
 	if (!requiresSave) return;
 
-	std::ofstream fs(title + ".sav", std::ios::binary);
+	if (!ofs.is_open()) throw std::runtime_error("Save file could not be open");
+	ofs.seekp(0);
+	ofs.write((char*)ram, ramSize);
 
-	if (!fs.is_open()) throw std::runtime_error("Save file could not be open");
-
-	fs.write((char*)ram, ramSize);
-
-	fs.close();
+	if (!ofs.good()) throw std::runtime_error("Failed to write");
 }
 
 
@@ -420,7 +434,7 @@ void MBC3::write(uint16_t address, uint8_t data)
 		{
 			int effectiveAddress = (address - 0xA000) + ramBankNumber * 0x2000;
 			ram[effectiveAddress] = data;
-			//save();
+			save();
 			return;
 		}
 

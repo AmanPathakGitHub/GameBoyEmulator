@@ -206,12 +206,12 @@ void Application::HandleInput()
 	if (IsKeyPressed(KEY_RIGHT))
 		emu.buttonState.right = true;
 	if (IsKeyPressed(KEY_Z))
-		emu.buttonState.a = true;
-	if (IsKeyPressed(KEY_X))
 		emu.buttonState.b = true;
+	if (IsKeyPressed(KEY_X))
+		emu.buttonState.a = true;
 	if (IsKeyPressed(KEY_ENTER))
 		emu.buttonState.start = true;
-	if (IsKeyPressed(KEY_LEFT_SHIFT))
+	if (IsKeyPressed(KEY_RIGHT_SHIFT))
 		emu.buttonState.select = true;
 
 	if (IsKeyReleased(KEY_UP))
@@ -223,12 +223,12 @@ void Application::HandleInput()
 	if (IsKeyReleased(KEY_RIGHT))
 		emu.buttonState.right = false;
 	if (IsKeyReleased(KEY_Z))
-		emu.buttonState.a = false;
-	if (IsKeyReleased(KEY_X))
 		emu.buttonState.b = false;
+	if (IsKeyReleased(KEY_X))
+		emu.buttonState.a = false;
 	if (IsKeyReleased(KEY_ENTER))
 		emu.buttonState.start = false;
-	if (IsKeyReleased(KEY_LEFT_SHIFT))
+	if (IsKeyReleased(KEY_RIGHT_SHIFT))
 		emu.buttonState.select = false;
 
 	if (GetKeyPressed() != 0)

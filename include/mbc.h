@@ -5,8 +5,19 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <fstream>
 
 struct CartridgeHeader; // forward declare to avoid circular definition
+
+class SaveManager
+{
+public:
+	SaveManager(std::string_view fileName);
+	void Save(char* data, size_t size);
+private:
+	std::ofstream m_OutputStream;
+};
+
 
 // Memory bank controller
 class MBC {
@@ -54,6 +65,7 @@ private:
 
 	std::string title; // file name to save and read from
 	
+	std::ofstream ofs;
 	bool requiresSave;
 };
 
@@ -77,6 +89,7 @@ private:
 
 	std::string title;
 
+	std::ofstream ofs;
 	void save();
 
 };
@@ -136,6 +149,8 @@ private:
 	bool requiresSave;
 	std::string title;
 	uint32_t ramSize;
+
+	std::ofstream ofs;
 
 	void save();
 
