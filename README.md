@@ -10,7 +10,8 @@ A Gameboy emulator written in C++, The project replicates the original Nintendo 
 
 # Features
 - Supports Games that use the MBC0 - MBC3, memory bank controllers
-- Built in debugging tools such as a basic disassembler and a memory viewer
+- Built in debugging tools including a memory viewer, disassembler and a tilemap viewer
+- Ability to speed up emulation and being able to pause it
 
 # How to run
  - Requires Cmake and a Internet connection to download packages 
