@@ -39,7 +39,7 @@ std::vector<std::string> Disassembler::disassemble(Emulator& emu, uint16_t start
 
 		}
 		else
-			currentInstruction = emu.cpu.InstructionByOpcode(opcode);
+			currentInstruction = emu.cpu.m_JumpTable[opcode];
 
 		std::stringstream ss;
 

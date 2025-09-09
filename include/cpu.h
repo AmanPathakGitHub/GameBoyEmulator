@@ -135,11 +135,6 @@ private:
 	
 	std::ofstream debug_file;
 
-
-
-
-
-
 	void cpu_push(uint8_t byte);
 	uint8_t cpu_pop();
 
