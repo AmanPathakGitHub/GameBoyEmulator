@@ -28,14 +28,14 @@ A Gameboy emulator written in C++, The project replicates the original Nintendo 
         
         cmake --build .
 # Technologies
- - ImGui
- - Raylib
- - Gtest  (for basic testing)
+ - [ImGui](https://github.com/ocornut/imgui)
+ - [Raylib](https://www.raylib.com)
+ - [Gtest](https://github.com/google/googletest)  (for basic testing)
 
 # Future Improvements
  - Add support for other platforms than windows
  - Add audio
- - Switch backend to just OpenGL and GLFW  to use ImGui Dockspace
+ - Switch backend to just OpenGL and GLFW  to use ImGui viewports
  - Add more ways to change emulation (Example changing color pallete)
  - Adding savestates 
 
