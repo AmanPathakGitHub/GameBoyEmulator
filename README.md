@@ -13,7 +13,17 @@ A Gameboy emulator written in C++, The project replicates the original Nintendo 
  - Requires Cmake and a Internet connection to download packages 
  - Requires a compiler that uses C++ 23
     
+    Create build directory
+        
+        mkdir build && cd build
 
+    Generate build files
+        
+        cmake ..
+
+    Build the project
+        
+        cmake --build .
 # Technologies
  - ImGui
  - Raylib
@@ -22,7 +32,7 @@ A Gameboy emulator written in C++, The project replicates the original Nintendo 
 # Future Improvements
  - Add support for other platforms than windows
  - Add audio
- - Switch backend to just OpenGL and GLFW  to use ImGui::Dockspace
+ - Switch backend to just OpenGL and GLFW  to use ImGui Dockspace
  - Add more ways to change emulation (Example changing color pallete)
  - Adding savestates 
 
