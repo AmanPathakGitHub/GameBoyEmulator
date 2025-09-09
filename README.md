@@ -2,10 +2,13 @@
 
 A Gameboy emulator written in C++, The project replicates the original Nintendo Gameboy released back in 1990. Its capable of loading the original ROM files and executing it to simulate the original console's behavior so it can be run on any windows computer.
 
+![idk](screenshots/Screenshot%202025-09-07%20220909.png)
+![idk](screenshots/Screenshot%202025-09-07%20215119.png)
+![idk](screenshots/Screenshot%202025-09-07%20193549.png)
+
 **(Does not support audio)**
 
 # Features
-- Able to play [insert perctanage of games]
 - Supports Games that use the MBC0 - MBC3, memory bank controllers
 - Built in debugging tools such as a basic disassembler and a memory viewer
 
